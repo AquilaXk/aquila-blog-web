@@ -35,6 +35,8 @@ import {
   isExplicitUploadAbort,
   isResumableVideoUploadFile,
 } from "../../src/apis/backend/cloud"
+import { resolveVideoUploadSession } from "../../src/apis/backend/cloudVideoUpload"
+import { readBoundedCloudSvgPreview, readBoundedCloudTextPreview } from "../../src/routes/Admin/cloud/cloudPreviewHelpers"
 import {
   buildExploreCursorPath,
   buildFeedCursorPath,
@@ -412,6 +414,69 @@ caption
       sort: "NAME",
       dir: "desc",
     })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "OLDEST",
+        sortDirection: "asc",
+      })
+    ).toEqual({ sort: "OLDEST" })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "OLDEST",
+        sortDirection: "desc",
+      })
+    ).toEqual({ sort: "OLDEST", dir: "desc" })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "LATEST",
+        sortDirection: "desc",
+      })
+    ).toEqual({})
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "LATEST",
+        sortDirection: "asc",
+      })
+    ).toEqual({ dir: "asc" })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "NAME",
+        sortDirection: "asc",
+      })
+    ).toEqual({ sort: "NAME" })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "SIZE",
+        sortDirection: "desc",
+      })
+    ).toEqual({ sort: "SIZE" })
+    expect(
+      buildCloudWorkspaceUrlQuery({
+        folderPath: "",
+        keyword: "",
+        mediaFilter: "ALL",
+        sortMode: "SIZE",
+        sortDirection: "asc",
+      })
+    ).toEqual({ sort: "SIZE", dir: "asc" })
 
     const sampleFiles: CloudFile[] = [
       {
@@ -728,6 +793,179 @@ caption
       deletion: "unlike toggle or browser storage deletion",
       stores: "JSON array of liked post ID strings for client UI state",
     })
+  })
+
+  test("resolveVideoUploadSession waits for UPLOADING_PART convergence with AbortSignal and preserves storage key on 409", async () => {
+    const store = new Map<string, string>()
+    const mockLocalStorage: Storage = {
+      get length() {
+        return store.size
+      },
+      clear: () => store.clear(),
+      getItem: (key: string) => store.get(key) ?? null,
+      key: (index: number) => Array.from(store.keys())[index] ?? null,
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+    }
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window")
+    const previousFetch = globalThis.fetch
+
+    const videoFile = new File(["video-bytes"], "demo.mp4", { type: "video/mp4" })
+    const storageKey = "aquila-cloud-video-upload-session::demo.mp4:11:0"
+
+    try {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        writable: true,
+        value: {
+          localStorage: mockLocalStorage,
+          location: { hostname: "localhost", origin: "http://localhost:3000" },
+        },
+      })
+
+      // 1) Converges UPLOADING_PART -> UPLOADING_PART -> IN_PROGRESS
+      store.set(storageKey, "701")
+      let sessionPollCalls = 0
+      globalThis.fetch = (async () => {
+        sessionPollCalls += 1
+        const status = sessionPollCalls < 3 ? "UPLOADING_PART" : "IN_PROGRESS"
+        return new Response(
+          JSON.stringify({
+            id: 701,
+            byteSize: videoFile.size,
+            status,
+            uploadedParts: [1],
+            totalParts: 2,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }) as typeof fetch
+
+      const convergedInProgress = await resolveVideoUploadSession(videoFile, "", storageKey, undefined, [1, 1, 1, 1])
+      expect(sessionPollCalls).toBe(3)
+      expect(convergedInProgress.kind).toBe("inProgress")
+      expect(store.get(storageKey)).toBe("701")
+
+      // 2) Converges UPLOADING_PART -> COMPLETING
+      let completingCalls = 0
+      globalThis.fetch = (async () => {
+        completingCalls += 1
+        const status = completingCalls === 1 ? "UPLOADING_PART" : "COMPLETING"
+        return new Response(
+          JSON.stringify({ id: 701, byteSize: videoFile.size, status }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }) as typeof fetch
+      const convergedCompleting = await resolveVideoUploadSession(videoFile, "", storageKey, undefined, [1, 1, 1, 1])
+      expect(convergedCompleting.kind).toBe("completing")
+
+      // 3) Converges UPLOADING_PART -> COMPLETED with completedFileId
+      let completedCalls = 0
+      globalThis.fetch = (async (input) => {
+        const url = String(input)
+        completedCalls += 1
+        if (url.endsWith("/files/99")) {
+          return new Response(
+            JSON.stringify({
+              id: 99,
+              ownerMemberId: 1,
+              originalFilename: "demo.mp4",
+              contentType: "video/mp4",
+              byteSize: videoFile.size,
+              mediaKind: "VIDEO",
+              folderPath: "",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        }
+        const status = completedCalls === 1 ? "UPLOADING_PART" : "COMPLETED"
+        return new Response(
+          JSON.stringify({ id: 701, byteSize: videoFile.size, status, completedFileId: 99 }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }) as typeof fetch
+      const convergedCompleted = await resolveVideoUploadSession(videoFile, "", storageKey, undefined, [1, 1, 1, 1])
+      expect(convergedCompleted).toMatchObject({ kind: "completed", file: { id: 99 } })
+
+      // 4) Remains UPLOADING_PART after 4 retries -> throws 409 ApiError and preserves storageKey
+      let stuckCalls = 0
+      globalThis.fetch = (async () => {
+        stuckCalls += 1
+        return new Response(
+          JSON.stringify({ id: 701, byteSize: videoFile.size, status: "UPLOADING_PART" }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }) as typeof fetch
+      await expect(
+        resolveVideoUploadSession(videoFile, "", storageKey, undefined, [1, 1, 1, 1])
+      ).rejects.toMatchObject({ status: 409 })
+      expect(stuckCalls).toBe(5)
+      expect(store.get(storageKey)).toBe("701")
+
+      // 5) AbortSignal cancels backoff immediately and preserves storageKey
+      const controller = new AbortController()
+      let abortTestCalls = 0
+      globalThis.fetch = (async () => {
+        abortTestCalls += 1
+        setTimeout(() => controller.abort(), 5)
+        return new Response(
+          JSON.stringify({ id: 701, byteSize: videoFile.size, status: "UPLOADING_PART" }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }) as typeof fetch
+      await expect(
+        resolveVideoUploadSession(videoFile, "", storageKey, controller.signal, [200, 200, 200, 200])
+      ).rejects.toMatchObject({ name: "AbortError" })
+      expect(abortTestCalls).toBe(1)
+      expect(store.get(storageKey)).toBe("701")
+    } finally {
+      globalThis.fetch = previousFetch
+      if (previousWindow) {
+        Object.defineProperty(globalThis, "window", previousWindow)
+      } else {
+        delete (globalThis as Record<string, unknown>).window
+      }
+    }
+  })
+
+  test("readBoundedCloudTextPreview and readBoundedCloudSvgPreview localize error messages for ko and en", async () => {
+    const previousFetch = globalThis.fetch
+    try {
+      globalThis.fetch = (async () => new Response("server error", { status: 500 })) as typeof fetch
+
+      expect(await readBoundedCloudTextPreview("/test.txt", 10, 1024, undefined, 10, "ko")).toEqual({
+        status: "error",
+        message: "미리보기를 불러오지 못했습니다. (HTTP 500)",
+      })
+      expect(await readBoundedCloudTextPreview("/test.txt", 10, 1024, undefined, 10, "en")).toEqual({
+        status: "error",
+        message: "Failed to load preview. (HTTP 500)",
+      })
+
+      expect(await readBoundedCloudSvgPreview("/test.svg", 100, undefined, "ko")).toEqual({
+        status: "error",
+        message: "SVG 원문을 불러오지 못했습니다. (HTTP 500)",
+      })
+      expect(await readBoundedCloudSvgPreview("/test.svg", 100, undefined, "en")).toEqual({
+        status: "error",
+        message: "Failed to load SVG source. (HTTP 500)",
+      })
+
+      expect(await readBoundedCloudSvgPreview("/big.svg", 300 * 1024, undefined, "ko")).toEqual({
+        status: "too_large",
+        message: "SVG 원문 미리보기 상한(256KB)을 초과했습니다.",
+      })
+      expect(await readBoundedCloudSvgPreview("/big.svg", 300 * 1024, undefined, "en")).toEqual({
+        status: "too_large",
+        message: "SVG source preview exceeds the 256KB limit.",
+      })
+    } finally {
+      globalThis.fetch = previousFetch
+    }
   })
 })
 

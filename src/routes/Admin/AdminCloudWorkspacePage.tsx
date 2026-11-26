@@ -4,12 +4,10 @@
  * - supabase/supabase StorageExplorer & CustomExpiryModal & MoveItemsModal (Apache-2.0)
  * - TryGhost/Ghost apps/shade/src/components/layout/view-bar.tsx (MIT License, Copyright (c) Ghost Foundation)
  */
-import { useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/router"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   getCloudFileDownloadUrl,
-  getCloudFileFacets,
   type CloudFile,
 } from "src/apis/backend/cloud"
 import { useLanguage } from "src/libs/language"
@@ -101,6 +99,7 @@ const AdminCloudWorkspacePage = () => {
     deleteCancelButtonRef,
     deleteConfirm,
     deleteDialogRef,
+    facetsQuery,
     files,
     filesById,
     filesQuery,
@@ -217,11 +216,6 @@ const AdminCloudWorkspacePage = () => {
     handleRequestDeleteFile,
   })
 
-  const facetsQuery = useQuery({
-    queryKey: ["admin-cloud-facets"],
-    queryFn: ({ signal }) => getCloudFileFacets(signal),
-    staleTime: 30_000,
-  })
   const facets = facetsQuery.data
 
   const summary = useMemo(() => getCloudSummary(files), [files])

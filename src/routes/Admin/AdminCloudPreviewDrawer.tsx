@@ -224,7 +224,8 @@ const InlineTextPreview = ({
       file.byteSize,
       MAX_INLINE_TEXT_SNIPPET_BYTES,
       controller.signal,
-      MAX_INLINE_TEXT_LINES
+      MAX_INLINE_TEXT_LINES,
+      language
     )
       .then((res) => {
         if (!controller.signal.aborted) setSnippet(res)
@@ -238,7 +239,7 @@ const InlineTextPreview = ({
         }
       })
     return () => controller.abort()
-  }, [contentUrl, file.byteSize, file.id, isEn])
+  }, [contentUrl, file.byteSize, file.id, isEn, language])
 
   return (
     <AssetPreviewContainer data-flush="true">
@@ -306,7 +307,7 @@ const ImageOrSvgPreview = ({
   useEffect(() => {
     if (!isSvg) return
     const controller = new AbortController()
-    void readBoundedCloudSvgPreview(versionedUrl, file.byteSize, controller.signal)
+    void readBoundedCloudSvgPreview(versionedUrl, file.byteSize, controller.signal, language)
       .then((res) => {
         if (controller.signal.aborted) return
         setSvgResult(res)
@@ -321,7 +322,7 @@ const ImageOrSvgPreview = ({
         }
       })
     return () => controller.abort()
-  }, [file.byteSize, file.id, isEn, isSvg, onDimensionsChange, versionedUrl])
+  }, [file.byteSize, file.id, isEn, isSvg, language, onDimensionsChange, versionedUrl])
 
   return (
     <AssetPreviewContainer

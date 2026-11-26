@@ -1,6 +1,6 @@
 // 클라우드 URL 쿼리(?folder=&kw=&kind=&sort=&dir=) 동기화 및 클립보드 붙여넣기·단축키(F2/Delete) 훅
 import type { NextRouter } from "next/router"
-import { type Dispatch, type SetStateAction, useEffect, useRef } from "react"
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react"
 import type { CloudFile } from "src/apis/backend/cloud"
 import {
   type CloudMediaFilter,
@@ -68,6 +68,7 @@ export const useCloudWorkspaceUrlAndShortcuts = ({
   handleRequestDeleteFile: (file: CloudFile) => void
 }) => {
   const hasHydratedQueryRef = useRef(false)
+  const [isUrlQueryHydrated, setIsUrlQueryHydrated] = useState(false)
 
   useEffect(() => {
     if (!router.isReady || hasHydratedQueryRef.current) return
@@ -77,11 +78,12 @@ export const useCloudWorkspaceUrlAndShortcuts = ({
     if (parsed.keyword !== undefined) setKeyword(parsed.keyword)
     if (parsed.mediaFilter !== undefined) setFilter(parsed.mediaFilter)
     if (parsed.sortMode !== undefined) setSortMode(parsed.sortMode, parsed.sortDirection)
+    setIsUrlQueryHydrated(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady])
 
   useEffect(() => {
-    if (!router.isReady || !hasHydratedQueryRef.current) return
+    if (!router.isReady || !isUrlQueryHydrated) return
     if (isCloudSearchPending(keyword, debouncedKeyword)) return
 
     const nextQuery = buildCloudWorkspaceUrlQuery({
@@ -111,7 +113,16 @@ export const useCloudWorkspaceUrlAndShortcuts = ({
     }
     void router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFolderPath, debouncedKeyword, filter, keyword, router.isReady, sortDirection, sortMode])
+  }, [
+    activeFolderPath,
+    debouncedKeyword,
+    filter,
+    isUrlQueryHydrated,
+    keyword,
+    router.isReady,
+    sortDirection,
+    sortMode,
+  ])
 
   useEffect(() => {
     setPage(1)

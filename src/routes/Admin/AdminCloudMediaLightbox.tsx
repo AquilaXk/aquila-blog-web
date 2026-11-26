@@ -39,6 +39,7 @@ import {
 import { CloudPdfLightboxStage } from "./cloud/CloudPdfLightboxStage"
 import {
   MAX_TEXT_PREVIEW_BYTES,
+  MAX_TEXT_PREVIEW_LINES,
   getCloudDocumentSubtype,
   readBoundedCloudSvgPreview,
   readBoundedCloudTextPreview,
@@ -64,7 +65,14 @@ const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentU
   useEffect(() => {
     const controller = new AbortController()
     setResult(null)
-    void readBoundedCloudTextPreview(contentUrl, file.byteSize, MAX_TEXT_PREVIEW_BYTES, controller.signal)
+    void readBoundedCloudTextPreview(
+      contentUrl,
+      file.byteSize,
+      MAX_TEXT_PREVIEW_BYTES,
+      controller.signal,
+      MAX_TEXT_PREVIEW_LINES,
+      language
+    )
       .then((res) => {
         if (!controller.signal.aborted) setResult(res)
       })
@@ -77,7 +85,7 @@ const LightboxTextCodeStage = ({ file, contentUrl }: { file: CloudFile; contentU
         }
       })
     return () => controller.abort()
-  }, [contentUrl, file.byteSize, file.id, isEn])
+  }, [contentUrl, file.byteSize, file.id, isEn, language])
 
   if (!result) {
     return (
@@ -184,7 +192,7 @@ export const AdminCloudMediaLightbox = ({
       getCloudFileContentUrl(file.id),
       file.modifiedAt || file.createdAt
     )
-    void readBoundedCloudSvgPreview(versionedUrl, file.byteSize, controller.signal)
+    void readBoundedCloudSvgPreview(versionedUrl, file.byteSize, controller.signal, language)
       .then((res) => {
         if (controller.signal.aborted) return
         setSvgPreview(res)
@@ -199,7 +207,7 @@ export const AdminCloudMediaLightbox = ({
         }
       })
     return () => controller.abort()
-  }, [file, isEn, isSvg, open])
+  }, [file, isEn, isSvg, language, open])
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = videoSpeed

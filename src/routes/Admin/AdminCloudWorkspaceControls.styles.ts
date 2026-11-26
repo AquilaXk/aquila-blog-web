@@ -567,7 +567,7 @@ export const EmptyState = styled.div`
   }
 `
 
-export const AssetGridCardCheckboxOverlay = styled.div`
+export const AssetGridCardCheckboxOverlay = styled.label`
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
@@ -581,6 +581,7 @@ export const AssetGridCardCheckboxOverlay = styled.div`
   border-radius: 5px;
   background: ${surface};
   box-shadow: ${adminCardShadow};
+  cursor: pointer;
   opacity: 0;
   transition: opacity 140ms ease;
   &[data-checked="true"] {

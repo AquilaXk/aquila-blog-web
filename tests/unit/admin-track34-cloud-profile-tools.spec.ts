@@ -78,6 +78,19 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
       { type: "image/svg+xml" }
     )
     expect((await validateCloudFileBeforeUpload(jsHrefSvg)).ok).toBe(false)
+
+    // 영어 모드(language = "en") 시그니처·용량·텍스트 검사 오류 메시지 확인
+    const enFakePdf = await validateCloudFileBeforeUpload(fakePdf, "en")
+    expect(enFakePdf).toEqual({ ok: false, reason: "Invalid PDF file header signature (%PDF-)." })
+    const enFakeMp4 = await validateCloudFileBeforeUpload(fakeMp4, "en")
+    expect(enFakeMp4).toEqual({ ok: false, reason: "Invalid video container header signature (ftyp/EBML)." })
+    const enXssSvg = await validateCloudFileBeforeUpload(scriptSvg, "en")
+    expect(enXssSvg).toEqual({
+      ok: false,
+      reason: "SVG files with scripts or event handlers cannot be uploaded.",
+    })
+    const enEmpty = await validateCloudFileBeforeUpload(new File([], "empty.txt", { type: "text/plain" }), "en")
+    expect(enEmpty).toEqual({ ok: false, reason: "Empty files (0 bytes) cannot be uploaded." })
   })
 
   test("AdminProfilePersistenceModel이 부분 누락된 SSR workspace.draft를 null-safe하게 정규화하고 이미지 시그니처를 선검증한다", async () => {

@@ -127,7 +127,7 @@ export const CloudShareLinkModal = ({
       setCopiedTarget(label)
       onToast({ tone: "success", text: `${label} — ${t.shareCopied}` })
     } catch (error) {
-      onToast({ tone: "error", text: resolveCloudErrorMessage(error) })
+      onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
     }
   }
 
@@ -139,7 +139,7 @@ export const CloudShareLinkModal = ({
       await copyTextToClipboard(t.shareTabExternal, issued.contentUrl)
       await refreshActiveTokens()
     } catch (error) {
-      onToast({ tone: "error", text: resolveCloudErrorMessage(error) })
+      onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
     } finally {
       setBusy(false)
     }
@@ -157,7 +157,7 @@ export const CloudShareLinkModal = ({
       await copyTextToClipboard(player.toUpperCase(), cmd)
       await refreshActiveTokens()
     } catch (error) {
-      onToast({ tone: "error", text: resolveCloudErrorMessage(error) })
+      onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
     } finally {
       setBusy(false)
     }
@@ -328,7 +328,7 @@ export const CloudShareLinkModal = ({
                         }
                         await refreshActiveTokens()
                       } catch (error) {
-                        onToast({ tone: "error", text: resolveCloudErrorMessage(error) })
+                        onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
                       } finally {
                         setBusy(false)
                       }
@@ -363,7 +363,7 @@ export const CloudShareLinkModal = ({
                             }
                             await refreshActiveTokens()
                           } catch (error) {
-                            onToast({ tone: "error", text: resolveCloudErrorMessage(error) })
+                            onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
                           } finally {
                             setBusy(false)
                           }

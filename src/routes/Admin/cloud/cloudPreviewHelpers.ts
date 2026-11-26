@@ -2,6 +2,7 @@
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist"
 import { type MutableRefObject, useEffect, useRef, useState } from "react"
 import type { CloudFile } from "src/apis/backend/cloud"
+import type { SiteLanguage } from "src/libs/language"
 import {
   MAX_SVG_MARKUP_BYTES,
   isImageCloudFile,
@@ -238,7 +239,8 @@ export const readBoundedCloudTextPreview = async (
   declaredByteSize: number,
   maxBytes = MAX_TEXT_PREVIEW_BYTES,
   signal?: AbortSignal,
-  maxLines = MAX_TEXT_PREVIEW_LINES
+  maxLines = MAX_TEXT_PREVIEW_LINES,
+  language: SiteLanguage = "ko"
 ): Promise<BoundedTextPreviewResult> => {
   const safeMaxBytes = Math.max(1, maxBytes)
   const response = await fetch(url, {
@@ -247,12 +249,23 @@ export const readBoundedCloudTextPreview = async (
     headers: { Range: `bytes=0-${safeMaxBytes - 1}` },
   })
   if (!response.ok) {
-    return { status: "error", message: `미리보기를 불러오지 못했습니다. (HTTP ${response.status})` }
+    return {
+      status: "error",
+      message:
+        language === "en"
+          ? `Failed to load preview. (HTTP ${response.status})`
+          : `미리보기를 불러오지 못했습니다. (HTTP ${response.status})`,
+    }
   }
 
   const streamRes = await readStreamBytesWithGuard(response, safeMaxBytes, "truncate", false)
   if (streamRes.kind === "binary") return { status: "binary" }
-  if (streamRes.kind === "too_large") return { status: "error", message: "파일 크기 상한을 초과했습니다." }
+  if (streamRes.kind === "too_large") {
+    return {
+      status: "error",
+      message: language === "en" ? "File exceeds preview size limit." : "파일 크기 상한을 초과했습니다.",
+    }
+  }
 
   const truncated =
     streamRes.overflowed || (Number.isFinite(declaredByteSize) && declaredByteSize > safeMaxBytes)
@@ -270,15 +283,25 @@ export const readBoundedCloudTextPreview = async (
 export const readBoundedCloudSvgPreview = async (
   url: string,
   declaredByteSize: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  language: SiteLanguage = "ko"
 ): Promise<BoundedSvgPreviewResult> => {
-  const svgLimitMsg = "SVG 원문 미리보기 상한(256KB)을 초과했습니다."
+  const svgLimitMsg =
+    language === "en"
+      ? "SVG source preview exceeds the 256KB limit."
+      : "SVG 원문 미리보기 상한(256KB)을 초과했습니다."
   if (Number.isFinite(declaredByteSize) && declaredByteSize > MAX_SVG_MARKUP_BYTES) {
     return { status: "too_large", message: svgLimitMsg }
   }
   const response = await fetch(url, { credentials: "include", signal })
   if (!response.ok) {
-    return { status: "error", message: `SVG 원문을 불러오지 못했습니다. (HTTP ${response.status})` }
+    return {
+      status: "error",
+      message:
+        language === "en"
+          ? `Failed to load SVG source. (HTTP ${response.status})`
+          : `SVG 원문을 불러오지 못했습니다. (HTTP ${response.status})`,
+    }
   }
   const contentLength = Number(response.headers.get("content-length") || 0)
   if (Number.isFinite(contentLength) && contentLength > MAX_SVG_MARKUP_BYTES) {
@@ -411,7 +434,7 @@ export const renderCloudPdfPageToCanvas = async (
   return task
 }
 
-export const resolveCloudErrorMessage = (error: unknown) => {
+export const resolveCloudErrorMessage = (error: unknown, language: SiteLanguage = "ko") => {
   if (error instanceof Error && error.message.trim()) return error.message.trim()
-  return "요청 처리 중 오류가 발생했습니다."
+  return language === "en" ? "An error occurred while processing the request." : "요청 처리 중 오류가 발생했습니다."
 }

@@ -1,7 +1,12 @@
 // 참조 구현: transloadit/uppy (MIT) & strapi/strapi (MIT) — 워드 단위 매직바이트·차원 상한·SVG XSS·UTF-8 선검증 가드
+import type { SiteLanguage } from "src/libs/language"
+import { getCloudSignatureMessages } from "./cloud/cloudSignatureMessages"
+
 export type FileSignatureValidationResult =
   | { ok: true }
   | { ok: false; reason: string }
+
+type SignatureMessages = ReturnType<typeof getCloudSignatureMessages>
 
 // CloudStorageProperties.kt / ImageUploadAdmissionValidator.kt 정본 상한과 일치
 export const MAX_CLOUD_IMAGE_BYTES = 50 * 1024 * 1024
@@ -207,16 +212,17 @@ const isBlockedExecutableHeader = (view: DataView, byteLength: number): boolean 
 const validateRasterPhotoHeader = (
   view: DataView,
   byteLength: number,
-  ext: string
+  ext: string,
+  msg: SignatureMessages
 ): FileSignatureValidationResult => {
   if (byteLength < 4) {
-    return { ok: false, reason: "이미지 확장자와 실제 파일 헤더 시그니처가 일치하지 않습니다." }
+    return { ok: false, reason: msg.rasterMismatch }
   }
   const word0 = view.getUint32(0, false)
 
   if (ext === "png") {
     if (word0 !== MAGIC_PNG) {
-      return { ok: false, reason: "PNG 파일 헤더 시그니처가 일치하지 않습니다." }
+      return { ok: false, reason: msg.pngHeader }
     }
     if (byteLength >= 24 && view.getUint32(12, false) === MAGIC_PNG_IHDR) {
       const width = view.getUint32(16, false)
@@ -226,10 +232,7 @@ const validateRasterPhotoHeader = (
         height > MAX_CLOUD_PHOTO_DIMENSION ||
         width * height > MAX_CLOUD_PHOTO_PIXELS
       ) {
-        return {
-          ok: false,
-          reason: "고해상도 이미지 픽셀 상한(16,384×16,384 / 100MP)을 초과했습니다.",
-        }
+        return { ok: false, reason: msg.pngDimensions }
       }
     }
     return { ok: true }
@@ -238,11 +241,11 @@ const validateRasterPhotoHeader = (
   if (ext === "jpg" || ext === "jpeg") {
     return view.getUint16(0, false) === 0xffd8 && view.getUint8(2) === 0xff
       ? { ok: true }
-      : { ok: false, reason: "JPEG 파일 헤더 시그니처가 일치하지 않습니다." }
+      : { ok: false, reason: msg.jpgHeader }
   }
   if (ext === "gif") {
     if (word0 !== MAGIC_GIF8) {
-      return { ok: false, reason: "GIF 파일 헤더 시그니처가 일치하지 않습니다." }
+      return { ok: false, reason: msg.gifHeader }
     }
     if (byteLength >= 10) {
       const width = view.getUint16(6, true)
@@ -252,10 +255,7 @@ const validateRasterPhotoHeader = (
         height > MAX_CLOUD_PHOTO_DIMENSION ||
         width * height > MAX_CLOUD_PHOTO_PIXELS
       ) {
-        return {
-          ok: false,
-          reason: "GIF 해상도가 안전 상한(16,384×16,384 / 100MP)을 초과했습니다.",
-        }
+        return { ok: false, reason: msg.gifDimensions }
       }
     }
     return { ok: true }
@@ -263,11 +263,11 @@ const validateRasterPhotoHeader = (
   if (ext === "webp") {
     return byteLength >= 12 && word0 === MAGIC_RIFF && view.getUint32(8, false) === MAGIC_WEBP
       ? { ok: true }
-      : { ok: false, reason: "WebP 파일 헤더 시그니처가 일치하지 않습니다." }
+      : { ok: false, reason: msg.webpHeader }
   }
   if (ext === "bmp") {
     if (view.getUint16(0, false) !== 0x424d) {
-      return { ok: false, reason: "BMP 파일 헤더 시그니처가 일치하지 않습니다." }
+      return { ok: false, reason: msg.bmpHeader }
     }
     if (byteLength >= 26) {
       const width = Math.abs(view.getInt32(18, true))
@@ -277,25 +277,20 @@ const validateRasterPhotoHeader = (
         height > MAX_CLOUD_PHOTO_DIMENSION ||
         width * height > MAX_CLOUD_PHOTO_PIXELS
       ) {
-        return {
-          ok: false,
-          reason: "BMP 해상도가 안전 상한(16,384×16,384 / 100MP)을 초과했습니다.",
-        }
+        return { ok: false, reason: msg.bmpDimensions }
       }
     }
     return { ok: true }
   }
   if (ext === "ico") {
-    return word0 === MAGIC_ICO
-      ? { ok: true }
-      : { ok: false, reason: "ICO 파일 헤더 시그니처가 일치하지 않습니다." }
+    return word0 === MAGIC_ICO ? { ok: true } : { ok: false, reason: msg.icoHeader }
   }
   if (ext === "avif") {
     return byteLength >= 12 && view.getUint32(4, false) === MAGIC_FTYP
       ? { ok: true }
-      : { ok: false, reason: "AVIF 파일 헤더 시그니처가 일치하지 않습니다." }
+      : { ok: false, reason: msg.avifHeader }
   }
-  return { ok: false, reason: "이미지 확장자와 실제 파일 헤더 시그니처가 일치하지 않습니다." }
+  return { ok: false, reason: msg.rasterMismatch }
 }
 
 const isValidPdfSignature = (view: DataView, byteLength: number): boolean =>
@@ -384,33 +379,40 @@ const isValidZipContainer = (view: DataView, byteLength: number): boolean => {
   return word0 === MAGIC_ZIP_LOCAL || word0 === MAGIC_ZIP_EMPTY || word0 === MAGIC_ZIP_SPANNED
 }
 
-const validateSvgPayload = async (file: File): Promise<FileSignatureValidationResult> => {
+const validateSvgPayload = async (
+  file: File,
+  msg: SignatureMessages
+): Promise<FileSignatureValidationResult> => {
   if (file.size > MAX_SVG_SCAN_BYTES) {
-    return { ok: false, reason: "SVG 파일 크기가 안전 스캔 상한(5MB)을 초과했습니다." }
+    return { ok: false, reason: msg.svgSizeLimit }
   }
   const svgSlice = file.slice(0, Math.min(file.size, MAX_SVG_SCAN_BYTES))
   const svgBuffer = await svgSlice.arrayBuffer()
   const svgBytes = new Uint8Array(svgBuffer)
   if (svgBytes.includes(0x00)) {
-    return { ok: false, reason: "SVG 파일에 허용되지 않는 NUL 바이트가 포함되어 있습니다." }
+    return { ok: false, reason: msg.svgNulByte }
   }
   let text: string
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(svgBytes)
   } catch {
-    return { ok: false, reason: "SVG 파일의 UTF-8 인코딩이 올바르지 않습니다." }
+    return { ok: false, reason: msg.svgInvalidUtf8 }
   }
   const lowerText = text.toLowerCase()
   if (!lowerText.includes("<svg")) {
-    return { ok: false, reason: "유효한 SVG 루트 태그가 없는 파일입니다." }
+    return { ok: false, reason: msg.svgNoRoot }
   }
   if (SVG_XSS_PATTERN.test(lowerText)) {
-    return { ok: false, reason: "스크립트 또는 이벤트 핸들러가 포함된 SVG는 업로드할 수 없습니다." }
+    return { ok: false, reason: msg.svgXss }
   }
   return { ok: true }
 }
 
-const validateTextPayload = async (file: File, ext: string): Promise<FileSignatureValidationResult> => {
+const validateTextPayload = async (
+  file: File,
+  ext: string,
+  msg: SignatureMessages
+): Promise<FileSignatureValidationResult> => {
   const sliceLen = Math.min(file.size, TEXT_PREFIX_SCAN_BYTES)
   const buf = await file.slice(0, sliceLen).arrayBuffer()
   const bytes = new Uint8Array(buf)
@@ -418,7 +420,7 @@ const validateTextPayload = async (file: File, ext: string): Promise<FileSignatu
   for (let i = 0; i < bytes.length; i += 1) {
     const code = bytes[i]!
     if (code < 128 && TEXT_ASCII_ALLOWED[code] !== 1 && !(allowEsc && code === 0x1b)) {
-      return { ok: false, reason: "텍스트 파일에 허용되지 않는 바이너리 제어 문자가 포함되어 있습니다." }
+      return { ok: false, reason: msg.textBinaryCtrl }
     }
   }
   // 64KB 경계에서 멀티바이트 UTF-8 문자가 잘렸을 수 있으므로 1~3바이트 여유를 두고 검사
@@ -434,22 +436,24 @@ const validateTextPayload = async (file: File, ext: string): Promise<FileSignatu
   try {
     new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, checkEnd))
   } catch {
-    return { ok: false, reason: "UTF-8 인코딩이 올바르지 않은 텍스트 파일입니다." }
+    return { ok: false, reason: msg.textInvalidUtf8 }
   }
   return { ok: true }
 }
 
 export const validateCloudFileBeforeUpload = async (
-  file: File
+  file: File,
+  language: SiteLanguage = "ko"
 ): Promise<FileSignatureValidationResult> => {
+  const msg = getCloudSignatureMessages(language)
   if (file.size <= 0) {
-    return { ok: false, reason: "빈 파일(0바이트)은 업로드할 수 없습니다." }
+    return { ok: false, reason: msg.emptyFile }
   }
 
   const ext = getExtension(file.name)
   const lowerMime = (file.type || "").toLowerCase()
   if (BLOCKED_EXECUTABLE_EXTENSIONS.has(ext)) {
-    return { ok: false, reason: "실행 파일 형식은 업로드할 수 없습니다." }
+    return { ok: false, reason: msg.blockedExecutableExt }
   }
 
   const category = resolveCloudMediaCategory(file.name, lowerMime)
@@ -463,7 +467,7 @@ export const validateCloudFileBeforeUpload = async (
   if (file.size > maxBytes) {
     return {
       ok: false,
-      reason: `파일 크기가 허용 상한(${formatLimitLabel(maxBytes)})을 초과했습니다.`,
+      reason: msg.sizeExceeded(formatLimitLabel(maxBytes)),
     }
   }
 
@@ -475,48 +479,44 @@ export const validateCloudFileBeforeUpload = async (
     const byteLength = headerBuffer.byteLength
 
     if (isBlockedExecutableHeader(view, byteLength)) {
-      return { ok: false, reason: "실행 바이너리 시그니처가 감지되어 업로드를 차단했습니다." }
+      return { ok: false, reason: msg.blockedExecutableHeader }
     }
 
     if (ext === "svg" || lowerMime === "image/svg+xml") {
-      return await validateSvgPayload(file)
+      return await validateSvgPayload(file, msg)
     }
 
     const rasterExt = RASTER_PHOTO_EXTENSIONS.has(ext)
       ? ext
       : inferRasterExtensionFromMime(lowerMime)
     if (rasterExt) {
-      return validateRasterPhotoHeader(view, byteLength, rasterExt)
+      return validateRasterPhotoHeader(view, byteLength, rasterExt, msg)
     }
 
     if (ext === "pdf" || lowerMime === "application/pdf") {
-      return isValidPdfSignature(view, byteLength)
-        ? { ok: true }
-        : { ok: false, reason: "PDF 파일 헤더 시그니처(%PDF-)가 일치하지 않습니다." }
+      return isValidPdfSignature(view, byteLength) ? { ok: true } : { ok: false, reason: msg.pdfHeader }
     }
 
     if (VIDEO_EXTENSIONS.has(ext) || lowerMime.startsWith("video/")) {
       return isValidVideoSignature(view, byteLength, ext, lowerMime)
         ? { ok: true }
-        : { ok: false, reason: "동영상 컨테이너 헤더 시그니처(ftyp/EBML)가 일치하지 않습니다." }
+        : { ok: false, reason: msg.videoHeader }
     }
 
     if (AUDIO_EXTENSIONS.has(ext) || lowerMime.startsWith("audio/")) {
       return isValidAudioSignature(view, bytes, byteLength, ext, lowerMime)
         ? { ok: true }
-        : { ok: false, reason: "오디오 파일 헤더 시그니처가 일치하지 않습니다." }
+        : { ok: false, reason: msg.audioHeader }
     }
 
     if (ZIP_DOCUMENT_AND_ARCHIVE_EXTENSIONS.has(ext)) {
-      return isValidZipContainer(view, byteLength)
-        ? { ok: true }
-        : { ok: false, reason: "ZIP/오피스 문서 컨테이너 시그니처(PK)가 일치하지 않습니다." }
+      return isValidZipContainer(view, byteLength) ? { ok: true } : { ok: false, reason: msg.zipHeader }
     }
 
     if (ext === "gz" || ext === "tgz") {
       return byteLength >= 3 && bytes[0] === 0x1f && bytes[1] === 0x8b && bytes[2] === 0x08
         ? { ok: true }
-        : { ok: false, reason: "GZIP 파일 헤더 시그니처가 일치하지 않습니다." }
+        : { ok: false, reason: msg.gzipHeader }
     }
 
     if (ext === "7z") {
@@ -524,12 +524,12 @@ export const validateCloudFileBeforeUpload = async (
         view.getUint32(0, false) === MAGIC_7Z_HEAD &&
         view.getUint16(4, false) === MAGIC_7Z_TAIL
         ? { ok: true }
-        : { ok: false, reason: "7z 아카이브 헤더 시그니처가 일치하지 않습니다." }
+        : { ok: false, reason: msg.sevenZipHeader }
     }
 
     if (ext === "tar") {
       if (file.size < 512) {
-        return { ok: false, reason: "TAR 아카이브 헤더가 올바르지 않습니다." }
+        return { ok: false, reason: msg.tarHeader }
       }
       const tarBuf = await file.slice(0, 512).arrayBuffer()
       const tarBytes = new Uint8Array(tarBuf)
@@ -539,21 +539,19 @@ export const validateCloudFileBeforeUpload = async (
         tarBytes[259] === 0x74 &&
         tarBytes[260] === 0x61 &&
         tarBytes[261] === 0x72
-      return hasUstar
-        ? { ok: true }
-        : { ok: false, reason: "TAR(ustar) 헤더 시그니처가 일치하지 않습니다." }
+      return hasUstar ? { ok: true } : { ok: false, reason: msg.tarUstar }
     }
 
     if (TEXT_EXTENSIONS.has(ext) || lowerMime.startsWith("text/") || TEXT_MIME_TYPES.has(lowerMime)) {
-      return await validateTextPayload(file, ext)
+      return await validateTextPayload(file, ext, msg)
     }
 
     if (!ALLOWED_NON_MEDIA_EXTENSIONS.has(ext)) {
-      return { ok: false, reason: "지원하지 않는 클라우드 파일 형식입니다." }
+      return { ok: false, reason: msg.unsupportedFormat }
     }
 
     return { ok: true }
   } catch {
-    return { ok: false, reason: "파일 헤더를 읽을 수 없습니다." }
+    return { ok: false, reason: msg.headerReadError }
   }
 }

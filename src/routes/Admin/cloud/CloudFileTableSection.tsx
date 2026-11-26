@@ -113,7 +113,7 @@ const getAriaSortForColumn = (
   if (!sortMode) return "none"
   if (column === "LATEST") {
     if (sortMode === "LATEST") return sortDirection === "asc" ? "ascending" : "descending"
-    if (sortMode === "OLDEST") return "ascending"
+    if (sortMode === "OLDEST") return sortDirection === "desc" ? "descending" : "ascending"
     return "none"
   }
   if (sortMode !== column) return "none"

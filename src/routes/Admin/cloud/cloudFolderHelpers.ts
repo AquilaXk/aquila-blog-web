@@ -153,12 +153,8 @@ export const buildCloudWorkspaceUrlQuery = ({
   if (keyword.trim()) nextQuery.kw = keyword
   if (mediaFilter !== "ALL") nextQuery.kind = mediaFilter
   if (sortMode !== "LATEST") nextQuery.sort = sortMode
-  if (sortDirection !== "desc" && sortMode === "LATEST") {
+  if (sortDirection !== getDefaultSortDirection(sortMode)) {
     nextQuery.dir = sortDirection
-  } else if (sortMode === "NAME" && sortDirection !== "asc") {
-    nextQuery.dir = sortDirection
-  } else if ((sortMode === "SIZE" || sortMode === "OLDEST") && sortDirection === "asc") {
-    nextQuery.dir = "asc"
   }
   return nextQuery
 }

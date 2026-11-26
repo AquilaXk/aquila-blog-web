@@ -218,7 +218,7 @@ export const useAdminCloudUploadQueue = ({
                 ? lang === "en"
                   ? "Paused on navigation"
                   : "전송 일시 중단됨"
-                : resolveCloudErrorMessage(error)
+                : resolveCloudErrorMessage(error, lang)
             callbacksRef.current.onNotice(
               isExplicitUserCancel || aborted
                 ? lang === "en"
@@ -258,7 +258,7 @@ export const useAdminCloudUploadQueue = ({
 
       const validFiles: File[] = []
       for (const file of selectedFiles) {
-        const validation = await validateCloudFileBeforeUpload(file)
+        const validation = await validateCloudFileBeforeUpload(file, language)
         if (!validation.ok) {
           onToast({ tone: "error", text: `${file.name}: ${validation.reason}` })
           continue
@@ -273,7 +273,7 @@ export const useAdminCloudUploadQueue = ({
         ...validFiles.map((file) => createUploadQueueItem(file, activeFolderPath)),
       ])
     },
-    [activeFolderPath, onToast]
+    [activeFolderPath, language, onToast]
   )
 
   const handleUploadSelect = useCallback(

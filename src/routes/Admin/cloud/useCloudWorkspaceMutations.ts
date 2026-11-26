@@ -141,6 +141,7 @@ export const useCloudWorkspaceMutations = ({
           })
         setKnownFolders(extractCloudFolders(remainingFiles))
         void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
+        void queryClient.invalidateQueries({ queryKey: [CLOUD_FACETS_QUERY_KEY] })
         setToast({
           tone: "success",
           text: isEn ? "Updated file details." : "파일 정보를 수정했습니다.",
@@ -199,6 +200,7 @@ export const useCloudWorkspaceMutations = ({
             })
           setCheckedFileIds((curr) => curr.filter((id) => !updatedMap.has(id)))
           void queryClient.invalidateQueries({ queryKey: [CLOUD_QUERY_KEY] })
+          void queryClient.invalidateQueries({ queryKey: [CLOUD_FACETS_QUERY_KEY] })
         }
 
         if (failedCount > 0) {

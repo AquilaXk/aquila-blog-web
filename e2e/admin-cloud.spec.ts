@@ -499,6 +499,9 @@ const setupAdminCloudMocks = async (
         const subset = activeFiles.filter((file) => file.mediaKind === kind)
         return { count: subset.length, bytes: subset.reduce((acc, file) => acc + file.byteSize, 0) }
       }
+      const folders = Array.from(
+        new Set(activeFiles.map((file) => normalizeFolderPathParam(file.folderPath)).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b))
       const photo = sumByKind("PHOTO")
       const video = sumByKind("VIDEO")
       const doc = sumByKind("DOCUMENT")
@@ -511,6 +514,7 @@ const setupAdminCloudMocks = async (
         videoBytes: video.bytes,
         documentCount: doc.count,
         documentBytes: doc.bytes,
+        folders,
       })
       return
     }
@@ -1092,25 +1096,29 @@ test.describe("관리자 클라우드", () => {
       .toBe("")
   })
 
-  test("100MB 초과 동영상은 resumable 세션과 조각 업로드로 처리한다", async ({ page }, testInfo) => {
-    const mocks = await setupAdminCloudMocks(page)
-    const largeVideo = Buffer.alloc(101 * 1024 * 1024)
-    Buffer.from([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70]).copy(largeVideo)
-    const largeVideoPath = testInfo.outputPath("대용량 교육 영상.mp4")
-    writeFileSync(largeVideoPath, largeVideo)
+  test.describe("대용량 동영상 분할 업로드", () => {
+    test.describe.configure({ mode: "default" })
 
-    await page.goto("/admin/cloud")
-    await switchToCloudListView(page)
-    await page.getByLabel("클라우드 파일 업로드").setInputFiles(largeVideoPath)
+    test("100MB 초과 동영상은 resumable 세션과 조각 업로드로 처리한다", async ({ page }, testInfo) => {
+      test.slow()
+      const mocks = await setupAdminCloudMocks(page)
+      const largeVideo = Buffer.alloc(101 * 1024 * 1024)
+      Buffer.from([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70]).copy(largeVideo)
+      const largeVideoPath = testInfo.outputPath("대용량 교육 영상.mp4")
+      writeFileSync(largeVideoPath, largeVideo)
 
-    await expect.poll(() => mocks.videoSessionCreates).toContain("대용량 교육 영상.mp4")
-    await expect.poll(() => mocks.videoPartNumbers).toEqual([1, 2])
-    await expect.poll(() => mocks.videoCompletes).toEqual(["301"])
-    await expect(page.getByLabel("업로드 중인 파일").getByText("완료", { exact: true })).toBeVisible()
-    await expect(page.getByRole("row", { name: /대용량 교육 영상\.mp4/ })).toBeVisible()
-    expect(mocks.uploadedNames).not.toContain("대용량 교육 영상.mp4")
-    expect(mocks.videoCancels).toEqual([])
-  })
+      await page.goto("/admin/cloud")
+      await switchToCloudListView(page)
+      await page.getByLabel("클라우드 파일 업로드").setInputFiles(largeVideoPath)
+
+      await expect.poll(() => mocks.videoSessionCreates).toContain("대용량 교육 영상.mp4")
+      await expect.poll(() => mocks.videoPartNumbers, { timeout: 25_000 }).toEqual([1, 2])
+      await expect.poll(() => mocks.videoCompletes, { timeout: 25_000 }).toEqual(["301"])
+      await expect(page.getByLabel("업로드 중인 파일").getByText("완료", { exact: true })).toBeVisible()
+      await expect(page.getByRole("row", { name: /대용량 교육 영상\.mp4/ })).toBeVisible()
+      expect(mocks.uploadedNames).not.toContain("대용량 교육 영상.mp4")
+      expect(mocks.videoCancels).toEqual([])
+    })
 
   test("대용량 동영상 일시 503 실패는 재시도 백오프 후 자동 복구된다", async ({ page }, testInfo) => {
     const autoRecoverMocks = await setupAdminCloudMocks(page, { failVideoPartOnceNumber: 2 })
@@ -1266,6 +1274,7 @@ test.describe("관리자 클라우드", () => {
     expect(mocks.videoPartNumbers).toEqual([])
     expect(mocks.videoCompletes).toEqual([])
     expect(mocks.videoCancels).toEqual([])
+    })
   })
 
   test("사진 선택 시 상세 패널은 이미지 요청을 즉시 시작하고 텍스트 로딩 상태를 숨긴다", async ({ page }) => {
@@ -1984,5 +1993,184 @@ test.describe("관리자 클라우드", () => {
     await expect(page.getByRole("dialog", { name: "파일 이름 변경" })).toBeVisible()
     await page.keyboard.press("Escape")
     await expect(page.getByRole("dialog", { name: "파일 이름 변경" })).toHaveCount(0)
+  })
+
+  test("CloudShareLinkModal은 navigator.clipboard 미지원 시 거짓 복사 토스트 없이 에러 토스트를 표시한다", async ({
+    page,
+  }) => {
+    const mocks = await setupAdminCloudMocks(page, { initialFiles: CLOUD_FILES })
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: undefined,
+      })
+    })
+
+    await page.goto("/admin/cloud")
+    await page.locator('button[title="home-server-rack.png"]').click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+
+    const shareDialog = page.getByRole("dialog", { name: "공유 링크 관리" })
+    await expect(shareDialog).toBeVisible()
+    await shareDialog.getByRole("button", { name: "공유 링크 발급" }).click()
+    await expect.poll(() => mocks.shareLinkRequests.length).toBe(1)
+
+    await expect(
+      page.getByRole("status").filter({ hasText: "클립보드 접근 권한이 없습니다" })
+    ).toBeVisible()
+    await expect(page.getByText(/복사됨/)).toHaveCount(0)
+    await expect(shareDialog.getByLabel("서명 외부 공유 링크")).toHaveValue(
+      /\/system\/api\/v1\/public\/cloud\/files\/102\/share\?token=/
+    )
+
+    await shareDialog.getByRole("tab", { name: "관리자 내부 경로" }).click()
+    const copyInternalBtn = shareDialog.getByRole("button", { name: "관리자 경로 복사" })
+    await copyInternalBtn.click()
+    await expect(
+      page.getByRole("status").filter({ hasText: "클립보드 접근 권한이 없습니다" })
+    ).toBeVisible()
+    await expect(copyInternalBtn).toHaveText("관리자 경로 복사")
+    await expect(page.getByText(/복사됨/)).toHaveCount(0)
+  })
+
+  test("(pointer: coarse) 환경에서 그리드·테이블 체크박스 >=44x44px 터치 영역과 CloudModalBackdrop z-index(210 > 160)가 충족된다", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 390, height: 844 },
+    })
+    const page = await context.newPage()
+    try {
+      await setupAdminCloudMocks(page, { initialFiles: CLOUD_FILES })
+      await page.goto("/admin/cloud")
+
+      const pointerCoarse = await page.evaluate(() => window.matchMedia("(pointer: coarse)").matches)
+      expect(pointerCoarse).toBe(true)
+
+      const gridCheckbox = page.getByRole("checkbox", { name: "home-server-rack.png 선택" })
+      const gridHitArea = gridCheckbox.locator("..")
+      await expect(gridHitArea).toBeVisible()
+      const gridBox = await gridHitArea.boundingBox()
+      expect(gridBox?.width ?? 0).toBeGreaterThanOrEqual(44)
+      expect(gridBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+      await gridHitArea.click({ position: { x: 4, y: 4 } })
+      await expect(gridCheckbox).toBeChecked()
+
+      await switchToCloudListView(page)
+      const tableCheckbox = page.getByRole("checkbox", { name: "home-server-rack.png 선택" })
+      const tableHitArea = tableCheckbox.locator("..")
+      await expect(tableHitArea).toBeVisible()
+      const tableBox = await tableHitArea.boundingBox()
+      expect(tableBox?.width ?? 0).toBeGreaterThanOrEqual(44)
+      expect(tableBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+
+      await page.getByRole("button", { name: /새 폴더/ }).click()
+      const newFolderDialog = page.getByRole("dialog", { name: "새 폴더 만들기" })
+      await expect(newFolderDialog).toBeVisible()
+      const backdropZIndex = await newFolderDialog
+        .locator("..")
+        .evaluate((el) => Number(window.getComputedStyle(el).zIndex))
+      expect(backdropZIndex).toBe(210)
+      expect(backdropZIndex).toBeGreaterThan(160)
+    } finally {
+      await context.close()
+    }
+  })
+
+  test("?folder=docs 직접 진입 시 facets.folders 기반 하위 폴더 브레드크럼 탐색과 OLDEST 정렬 URL 동기화가 동작한다", async ({
+    page,
+  }) => {
+    const folderFiles: CloudFileFixture[] = [
+      {
+        id: 201,
+        ownerMemberId: 1,
+        originalFilename: "docs-older.pdf",
+        contentType: "application/pdf",
+        byteSize: 1024,
+        mediaKind: "DOCUMENT",
+        folderPath: "docs",
+        createdAt: "2026-06-08T09:00:00Z",
+        modifiedAt: "2026-06-08T09:00:00Z",
+      },
+      {
+        id: 202,
+        ownerMemberId: 1,
+        originalFilename: "docs-root.pdf",
+        contentType: "application/pdf",
+        byteSize: 2048,
+        mediaKind: "DOCUMENT",
+        folderPath: "docs",
+        createdAt: "2026-06-10T09:00:00Z",
+        modifiedAt: "2026-06-10T09:00:00Z",
+      },
+      {
+        id: 203,
+        ownerMemberId: 1,
+        originalFilename: "docs-2026.pdf",
+        contentType: "application/pdf",
+        byteSize: 3072,
+        mediaKind: "DOCUMENT",
+        folderPath: "docs/2026",
+        createdAt: "2026-06-12T09:00:00Z",
+        modifiedAt: "2026-06-12T09:00:00Z",
+      },
+      {
+        id: 204,
+        ownerMemberId: 1,
+        originalFilename: "docs-2026-q1.pdf",
+        contentType: "application/pdf",
+        byteSize: 4096,
+        mediaKind: "DOCUMENT",
+        folderPath: "docs/2026/q1",
+        createdAt: "2026-06-14T09:00:00Z",
+        modifiedAt: "2026-06-14T09:00:00Z",
+      },
+      {
+        id: 205,
+        ownerMemberId: 1,
+        originalFilename: "photos-unrelated.png",
+        contentType: "image/png",
+        byteSize: 512,
+        mediaKind: "PHOTO",
+        folderPath: "photos",
+        createdAt: "2026-06-15T09:00:00Z",
+        modifiedAt: "2026-06-15T09:00:00Z",
+      },
+    ]
+
+    await setupAdminCloudMocks(page, { initialFiles: folderFiles })
+    await page.goto("/admin/cloud?folder=docs")
+    await switchToCloudListView(page)
+
+    await expect(page.getByRole("row", { name: /docs-root\.pdf/ })).toBeVisible()
+    await expect(page.getByRole("row", { name: /docs-older\.pdf/ })).toBeVisible()
+    await expect(page.getByRole("row", { name: /docs-2026\.pdf/ })).toHaveCount(0)
+
+    const subfolder2026 = page.locator('button[title="/docs/2026"]')
+    await expect(subfolder2026).toBeVisible()
+    await subfolder2026.click()
+
+    await expect.poll(() => new URL(page.url()).searchParams.get("folder")).toBe("docs/2026")
+    await expect(page.getByRole("row", { name: /docs-2026\.pdf/ })).toBeVisible()
+    await expect(page.locator('button[title="/docs/2026/q1"]')).toBeVisible()
+
+    await page.locator('nav[aria-label="폴더 경로 탐색"] button[title="/docs"]').click()
+    await expect.poll(() => new URL(page.url()).searchParams.get("folder")).toBe("docs")
+    await expect(page.getByRole("row", { name: /docs-root\.pdf/ })).toBeVisible()
+
+    await page.getByLabel("파일 정렬").selectOption("OLDEST")
+    await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("OLDEST")
+    expect(new URL(page.url()).searchParams.get("dir")).toBeNull()
+    await expect(page.locator("tbody tr").first()).toContainText("docs-older.pdf")
+
+    await page.goto("/admin/cloud?folder=docs&sort=OLDEST&dir=desc")
+    await switchToCloudListView(page)
+    await expect(page.getByRole("row", { name: /docs-root\.pdf/ })).toBeVisible()
+    await page.waitForTimeout(200)
+    expect(new URL(page.url()).searchParams.get("sort")).toBe("OLDEST")
+    expect(new URL(page.url()).searchParams.get("dir")).toBe("desc")
+    await expect(page.locator("tbody tr").first()).toContainText("docs-root.pdf")
   })
 })

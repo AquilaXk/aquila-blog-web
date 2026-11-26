@@ -2145,6 +2145,7 @@ export interface components {
             documentCount?: number;
             /** Format: int64 */
             documentBytes?: number;
+            folders?: string[];
         };
         AdminSystemBootstrapResBody: {
             member?: components["schemas"]["AuthSessionMemberDto"];

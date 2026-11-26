@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   getCloudFileContentUrl,
+  getCloudFileFacets,
   listCloudFiles,
   type CloudFile,
   type CloudMediaKind,
@@ -33,7 +34,9 @@ import { computeShiftRangeSelection } from "./cloudUploadQueueModel"
 import { useAdminCloudUploadQueue } from "./useAdminCloudUploadQueue"
 
 const CLOUD_QUERY_KEY = "admin-cloud-files"
+const CLOUD_FACETS_QUERY_KEY = "admin-cloud-facets"
 const EMPTY_CLOUD_FILES: CloudFile[] = []
+const EMPTY_CLOUD_FOLDERS: string[] = []
 
 const CLOUD_UI_COMPOSING = 1
 const CLOUD_UI_DETAIL_OPEN = 1 << 1
@@ -177,6 +180,13 @@ export const useAdminCloudWorkspaceActions = () => {
       }),
   })
 
+  const facetsQuery = useQuery({
+    queryKey: [CLOUD_FACETS_QUERY_KEY],
+    queryFn: ({ signal }) => getCloudFileFacets(signal),
+    staleTime: 30_000,
+  })
+  const facetFolders = facetsQuery.data?.folders ?? EMPTY_CLOUD_FOLDERS
+
   const serverFiles = filesQuery.data ?? EMPTY_CLOUD_FILES
   const visibleOptimisticFiles = useMemo(
     () =>
@@ -200,8 +210,8 @@ export const useAdminCloudWorkspaceActions = () => {
   const fileIdSet = useMemo(() => new Set(fileIds), [fileIds])
 
   const allFolders = useMemo(
-    () => extractAllCloudFolders(files, [...knownFolders, ...createdFolders], normalizedFolderPath),
-    [createdFolders, files, knownFolders, normalizedFolderPath]
+    () => extractAllCloudFolders(files, [...knownFolders, ...createdFolders, ...facetFolders], normalizedFolderPath),
+    [createdFolders, facetFolders, files, knownFolders, normalizedFolderPath]
   )
   const childFolders = useMemo(
     () => extractDirectChildFolders(allFolders, normalizedFolderPath),
@@ -475,6 +485,7 @@ export const useAdminCloudWorkspaceActions = () => {
     deleteCancelButtonRef,
     deleteConfirm,
     deleteDialogRef,
+    facetsQuery,
     files,
     filesById,
     filesQuery,

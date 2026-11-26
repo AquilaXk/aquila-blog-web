@@ -273,6 +273,7 @@ export type CloudFileFacets = {
   videoBytes: number
   documentCount: number
   documentBytes: number
+  folders: string[]
 }
 
 export const getCloudFileFacets = async (signal?: AbortSignal): Promise<CloudFileFacets> => {
@@ -286,6 +287,9 @@ export const getCloudFileFacets = async (signal?: AbortSignal): Promise<CloudFil
     videoBytes: Number(res.videoBytes || 0),
     documentCount: Number(res.documentCount || 0),
     documentBytes: Number(res.documentBytes || 0),
+    folders: Array.isArray(res.folders)
+      ? res.folders.filter((folder): folder is string => typeof folder === "string" && folder.trim().length > 0)
+      : [],
   }
 }
 

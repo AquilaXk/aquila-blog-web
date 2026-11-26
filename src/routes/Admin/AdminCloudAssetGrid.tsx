@@ -10,6 +10,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import {
@@ -113,6 +114,7 @@ const AssetCardItem = ({
   const { language } = useLanguage()
   const t = getCloudDictionary(language)
   const [mediaLoadFailed, setMediaLoadFailed] = useState(false)
+  const lastShiftKeyRef = useRef(false)
   useEffect(() => setMediaLoadFailed(false), [file.id, file.modifiedAt])
 
   const isImage = isImageCloudFile(file)
@@ -169,6 +171,9 @@ const AssetCardItem = ({
       <StyledCardHeader>
         <W.AssetGridCardCheckboxOverlay
           data-checked={toBooleanAttr(checked)}
+          onPointerDown={(e) => {
+            lastShiftKeyRef.current = e.shiftKey
+          }}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
@@ -179,11 +184,14 @@ const AssetCardItem = ({
               language === "en" ? `Select ${file.originalFilename}` : `${file.originalFilename} 선택`
             }
             checked={checked}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleChecked(file.id, e.shiftKey)
+            onKeyDown={(e) => {
+              lastShiftKeyRef.current = e.shiftKey
             }}
-            onChange={() => {}}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onChange={() => {
+              onToggleChecked(file.id, lastShiftKeyRef.current)
+              lastShiftKeyRef.current = false
+            }}
           />
         </W.AssetGridCardCheckboxOverlay>
 

@@ -21,6 +21,7 @@ const CLOUD_VIDEO_RESUMABLE_PART_BYTES = 64 * 1024 * 1024
 const CLOUD_VIDEO_RESUMABLE_CHUNK_TIMEOUT_MS = 5 * 60_000
 const CLOUD_VIDEO_UPLOAD_SESSION_STORAGE_PREFIX = "aquila-cloud-video-upload-session"
 const VIDEO_PART_RETRY_BACKOFF_MS = [600, 1500]
+export const UPLOADING_PART_CONVERGENCE_BACKOFF_MS = [250, 500, 1000, 1500] as const
 
 export type CloudFile = Required<
   Pick<
@@ -233,26 +234,37 @@ const isMatchingVideoUploadSessionFile = (session: CloudVideoUploadSession, file
 export const isDefinitiveStaleVideoUploadSessionError = (error: unknown) =>
   error instanceof ApiError && (error.status === 404 || error.status === 410)
 
-type ResolvedVideoUploadSession =
+export type ResolvedVideoUploadSession =
   | { kind: "inProgress"; session: CloudVideoUploadSession }
   | { kind: "completing"; session: CloudVideoUploadSession }
   | { kind: "completed"; file: CloudFile }
 
-const resolveVideoUploadSession = async (
+export const resolveVideoUploadSession = async (
   file: File,
   folderPath: string,
   storageKey: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  backoffScheduleMs: readonly number[] = UPLOADING_PART_CONVERGENCE_BACKOFF_MS
 ): Promise<ResolvedVideoUploadSession> => {
   const storedSessionId = readStoredVideoUploadSessionId(storageKey)
   if (storedSessionId) {
     try {
-      const storedSession = await getVideoUploadSession(storedSessionId, signal)
+      let storedSession = await getVideoUploadSession(storedSessionId, signal)
+      let attempt = 0
+      while (
+        isMatchingVideoUploadSessionFile(storedSession, file) &&
+        storedSession.status === "UPLOADING_PART" &&
+        attempt < backoffScheduleMs.length
+      ) {
+        await sleepWithSignal(backoffScheduleMs[attempt]!, signal)
+        attempt += 1
+        storedSession = await getVideoUploadSession(storedSessionId, signal)
+      }
       if (isMatchingVideoUploadSessionFile(storedSession, file)) {
         if (storedSession.status === "COMPLETING") {
           return { kind: "completing", session: storedSession }
         }
-        if (storedSession.status === "IN_PROGRESS" || storedSession.status === "UPLOADING_PART") {
+        if (storedSession.status === "IN_PROGRESS") {
           return { kind: "inProgress", session: storedSession }
         }
         if (storedSession.status === "COMPLETED" && storedSession.completedFileId) {
@@ -260,6 +272,15 @@ const resolveVideoUploadSession = async (
             kind: "completed",
             file: await getCloudFile(storedSession.completedFileId, signal),
           }
+        }
+        if (storedSession.status === "UPLOADING_PART") {
+          throw new ApiError(
+            409,
+            `/system/api/v1/adm/cloud/files/video-upload-sessions/${storedSessionId}`,
+            JSON.stringify({
+              msg: "이전 동영상 조각 업로드가 아직 처리 중입니다. 잠시 후 다시 시도해주세요.",
+            })
+          )
         }
       }
     } catch (error) {
