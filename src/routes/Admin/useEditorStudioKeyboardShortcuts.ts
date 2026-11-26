@@ -35,7 +35,7 @@ type UseEditorStudioKeyboardShortcutsParams = {
   postCategory: string
   addTagsToPost?: (tags: string[]) => string[]
   setTagDraft?: (value: string) => void
-  saveLocalDraft: (options?: { silent?: boolean; force?: boolean }) => void
+  saveLocalDraft: (options?: { silent?: boolean; force?: boolean }) => boolean | void
   onSaveServerTempDraft?: (options?: { silent?: boolean }) => Promise<boolean>
   setPostVersion: (version: number) => void
   setPublishStatus: (notice: PublishNotice, target?: "page" | "modal") => void
@@ -242,9 +242,9 @@ export const useEditorStudioKeyboardShortcuts = ({
           state.setTagDraft?.("")
         }
         if (hasInvalidCanonicalUrlInput(state.postCanonicalUrl)) {
-          state.saveLocalDraft({ silent: false, force: true })
+          const localSaved = state.saveLocalDraft({ silent: false, force: true }) !== false
           state.setPublishStatus(
-            { tone: "error", text: formatInvalidCanonicalDraftSaveNotice(state.isEn) },
+            { tone: "error", text: formatInvalidCanonicalDraftSaveNotice(state.isEn, localSaved) },
             "page"
           )
           return

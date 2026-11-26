@@ -24,12 +24,15 @@ import {
 } from "../../src/components/markdown-editor/markdownEditorToolbarModel"
 import {
   buildEditorStateFingerprint,
+  buildLocalDraftFingerprint,
   CANONICAL_URL_MAX_LENGTH,
   computeContentFingerprint,
+  dedupeStrings,
   detectPublishPlaceholderIssue,
   normalizeSafeCanonicalUrl,
   POST_CONTENT_MAX_LENGTH,
 } from "../../src/routes/Admin/editorStudioMetaModel"
+import { normalizeCategoryValue } from "../../src/libs/utils"
 import { scanMarkdownPrePublishWarnings } from "../../src/routes/Admin/editorStudioPublishWarnings"
 import { EditorStudioInspectorPublishingFields } from "../../src/routes/Admin/EditorStudioInspectorPublishingFields"
 import { EditorStudioPublishMetadataSection } from "../../src/routes/Admin/EditorStudioPublishMetadataSection"
@@ -39,7 +42,11 @@ import { toVisibility } from "../../src/routes/Admin/editorStudioState"
 import {
   getLocalDraftDocumentId,
   localDraftStorageKeyForDocument,
+  persistLocalDraft,
+  readLocalDraft,
+  removeLocalDraft,
 } from "../../src/routes/Admin/editorStudioStorageModel"
+import { useEditorStudioLocalDraftLifecycle } from "../../src/routes/Admin/useEditorStudioDraftLifecycleModel"
 import { useEditorStudioKeyboardShortcuts } from "../../src/routes/Admin/useEditorStudioKeyboardShortcuts"
 import {
   executeServerTempDraftSave,
@@ -255,8 +262,16 @@ test.describe("Editor Phase 3 features & edge cases", () => {
     expect(normalizeSafeCanonicalUrl("https://origin.example.com/posts/1?ref=blog")).toBe(
       "https://origin.example.com/posts/1?ref=blog"
     )
+    expect(normalizeSafeCanonicalUrl("https://example.com/@author/post")).toBe("https://example.com/@author/post")
+    expect(normalizeSafeCanonicalUrl("https://example.com/post?ref=@author#@top")).toBe(
+      "https://example.com/post?ref=@author#@top"
+    )
     expect(normalizeSafeCanonicalUrl("javascript:alert(1)")).toBe("")
     expect(normalizeSafeCanonicalUrl("https://user:pass@origin.example.com/p")).toBe("")
+    expect(normalizeSafeCanonicalUrl("https://@example.com/post")).toBe("")
+    expect(normalizeSafeCanonicalUrl("https://:@example.com/post")).toBe("")
+    expect(normalizeSafeCanonicalUrl("https:example.com/post")).toBe("")
+    expect(normalizeSafeCanonicalUrl("https://evil.com\\@example.com/post")).toBe("")
     expect(normalizeSafeCanonicalUrl("https://origin.example.com/\nline")).toBe("")
     expect(normalizeSafeCanonicalUrl(`https://origin.example.com/${"a".repeat(CANONICAL_URL_MAX_LENGTH)}`)).toBe("")
 
@@ -291,6 +306,9 @@ test.describe("Editor Phase 3 features & edge cases", () => {
     ).toContain("500,000")
     expect(
       validateEditorContentPreflight({ ...preflightCommon, postCanonicalUrl: "javascript:alert(1)" })
+    ).toContain("http://")
+    expect(
+      validateEditorContentPreflight({ ...preflightCommon, postCanonicalUrl: "https://@example.com/post" })
     ).toContain("http://")
     expect(
       validateEditorContentPreflight({ ...preflightCommon, postSeriesOrder: 0 })
@@ -334,8 +352,12 @@ test.describe("Editor Phase 3 features & edge cases", () => {
     }
 
     expect(normalizeExternalCanonicalUrl("https://external.example.org/p")).toBe("https://external.example.org/p")
+    expect(normalizeExternalCanonicalUrl("https://external.example.org/@author/p")).toBe(
+      "https://external.example.org/@author/p"
+    )
     expect(normalizeExternalCanonicalUrl("javascript:alert(1)")).toBe("")
     expect(normalizeExternalCanonicalUrl("https://secret:tok@external.example.org/p")).toBe("")
+    expect(normalizeExternalCanonicalUrl("https://@external.example.org/p")).toBe("")
 
     const meta = buildPostDetailMetadata(basePost)
     expect(meta.url).toContain("/posts/1401")
@@ -542,6 +564,29 @@ test.describe("Editor Phase 3 features & edge cases", () => {
         expect(statusCalls.at(-1)?.notice.text).toContain("http://")
         expect(statusCalls.at(-1)?.target).toBe("page")
 
+        // 2b. Empty userInfo canonicalUrl (https://@example.com/post) also fails closed without fetch
+        const emptyUserInfoOk = await executeServerTempDraftSave({
+          ...commonInput,
+          silent: false,
+          postCanonicalUrl: "https://@example.com/post",
+        })
+        expect(emptyUserInfoOk).toBe(false)
+        expect(capturedBodies).toHaveLength(0)
+        expect(statusCalls.at(-1)?.notice.tone).toBe("error")
+
+        // 2c. When saveLocalDraft returns false (e.g., storage quota/gated), notice must not falsely claim local save succeeded
+        const failedLocalSaveOk = await executeServerTempDraftSave({
+          ...commonInput,
+          silent: false,
+          postCanonicalUrl: "https://",
+          saveLocalDraft: () => false,
+        })
+        expect(failedLocalSaveOk).toBe(false)
+        expect(capturedBodies).toHaveLength(0)
+        expect(statusCalls.at(-1)?.notice.tone).toBe("error")
+        expect(statusCalls.at(-1)?.notice.text).not.toContain("로컬 초안")
+        expect(statusCalls.at(-1)?.notice.text).toContain("http://")
+
         // 3. Clearing canonicalUrl (empty string) intentionally sends null, updates baseline, and cleans up submitted local draft
         const clearOk = await executeServerTempDraftSave({
           ...commonInput,
@@ -716,6 +761,157 @@ test.describe("Editor Phase 3 features & edge cases", () => {
         })
         expect(clearedModal).toEqual([""])
         expect(clearedInspector).toEqual([""])
+      } finally {
+        await act(async () => {
+          root.unmount()
+        })
+      }
+    })
+  })
+
+  test("local draft lifecycle saves metadata-only edits and clears lingering schedule on PRIVATE restore", async () => {
+    const futureIso = new Date(Date.now() + 3_600_000).toISOString()
+    await withClientDom(async ({ storage, rootContainer }) => {
+      const root = createRoot(rootContainer)
+      let scheduledAtState = ""
+      let visibilityState: "PUBLIC_LISTED" | "PUBLIC_UNLISTED" | "PRIVATE" = "PUBLIC_LISTED"
+      let canonicalUrlState = "https://"
+      const noop = () => {}
+      const getEmptyContent = () => ""
+      const summaryIntentAuto = { kind: "auto" } as const
+      const emptyTags: string[] = []
+      const lastLocalDraftFingerprintRef = { current: "" }
+      const lastWriteFingerprintRef = { current: "" }
+      const lastWriteIdempotencyKeyRef = { current: "" }
+      const setPostVisibility = (
+        next:
+          | "PUBLIC_LISTED"
+          | "PUBLIC_UNLISTED"
+          | "PRIVATE"
+          | ((
+              prev: "PUBLIC_LISTED" | "PUBLIC_UNLISTED" | "PRIVATE",
+            ) => "PUBLIC_LISTED" | "PUBLIC_UNLISTED" | "PRIVATE"),
+      ) => {
+        visibilityState = typeof next === "function" ? next(visibilityState) : next
+      }
+      const setPostScheduledAt = (next: string | ((prev: string) => string)) => {
+        scheduledAtState = typeof next === "function" ? next(scheduledAtState) : next
+      }
+      const setPostCanonicalUrl = (next: string | ((prev: string) => string)) => {
+        canonicalUrlState = typeof next === "function" ? next(canonicalUrlState) : next
+      }
+      let api!: ReturnType<typeof useEditorStudioLocalDraftLifecycle>
+
+      const Probe = () => {
+        api = useEditorStudioLocalDraftLifecycle({
+          editorMode: "edit",
+          postId: "77",
+          postVersion: 1,
+          loadingKey: "",
+          postTitle: "",
+          postContent: "",
+          getCurrentPostContent: getEmptyContent,
+          postSummary: "",
+          postSummarySource: "NONE",
+          summaryIntent: summaryIntentAuto,
+          postThumbnailUrl: "",
+          postThumbnailFocusX: 50,
+          postThumbnailFocusY: 50,
+          postThumbnailZoom: 1,
+          postTags: emptyTags,
+          postCategory: "",
+          postVisibility: visibilityState,
+          postScheduledAt: scheduledAtState,
+          postSeriesName: "",
+          postSeriesOrder: null,
+          postCanonicalUrl: canonicalUrlState,
+          setEditorMode: noop,
+          setIsTempDraftMode: noop,
+          setPostId: noop,
+          setPostVersion: noop,
+          setPreviewThumbnailSourceUrl: noop,
+          setPostTitle: noop,
+          setPostContent: noop,
+          setPostSummary: noop,
+          setPostSummarySource: noop,
+          setSummaryIntent: noop,
+          setPostThumbnailUrl: noop,
+          setPostThumbnailFocusX: noop,
+          setPostThumbnailFocusY: noop,
+          setPostThumbnailZoom: noop,
+          setPostTags: noop,
+          setPostCategory: noop,
+          setPostVisibility,
+          setPostScheduledAt,
+          setPostSeriesName: noop,
+          setPostSeriesOrder: noop,
+          setPostCanonicalUrl,
+          setLocalDraftSavedAt: noop,
+          setPublishStatus: noop,
+          dedupeStrings,
+          normalizeCategoryValue,
+          buildLocalDraftFingerprint,
+          persistLocalDraft,
+          readLocalDraft,
+          removeLocalDraft,
+          lastLocalDraftFingerprintRef,
+          lastWriteFingerprintRef,
+          lastWriteIdempotencyKeyRef,
+        })
+        return null
+      }
+
+      try {
+        await act(async () => {
+          root.render(
+            createElement(ClientLanguageProvider, {
+              initialLanguage: "ko",
+              children: createElement(Probe),
+            })
+          )
+        })
+
+        // Metadata-only invalid canonicalUrl draft persists safely instead of silently returning false
+        let saved = false
+        await act(async () => {
+          saved = api.saveLocalDraft({ silent: false, force: true })
+        })
+        expect(saved).toBe(true)
+        const stored = readLocalDraft({ kind: "post", postId: "77" })
+        expect(stored?.canonicalUrl).toBe("https://")
+
+        // Restoring a local draft marked PRIVATE drops any lingering scheduledAt
+        const key = localDraftStorageKeyForDocument({ kind: "post", postId: "77" }, getLocalDraftDocumentId())
+        storage.setItem(
+          key,
+          JSON.stringify({
+            title: "Private draft",
+            content: "Private body",
+            summary: "",
+            summarySource: "NONE",
+            summaryIntent: { kind: "auto" },
+            thumbnailUrl: "",
+            thumbnailFocusX: 50,
+            thumbnailFocusY: 50,
+            thumbnailZoom: 1,
+            tags: [],
+            category: "",
+            visibility: "PRIVATE",
+            scheduledAt: futureIso,
+            seriesName: "",
+            seriesOrder: null,
+            canonicalUrl: "",
+            savedAt: new Date().toISOString(),
+            source: { kind: "post", postId: "77" },
+            postVersion: 1,
+          })
+        )
+        scheduledAtState = futureIso
+        await act(async () => {
+          api.restoreLocalDraft(key)
+        })
+        expect(visibilityState).toBe("PRIVATE")
+        expect(scheduledAtState).toBe("")
       } finally {
         await act(async () => {
           root.unmount()

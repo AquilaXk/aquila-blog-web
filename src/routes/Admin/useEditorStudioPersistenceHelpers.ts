@@ -117,7 +117,7 @@ export type UseEditorStudioPersistenceParams = {
     handoff: import("./editorCreatedPostHandoff").CreatedEditorPostHandoffInput
   ) => Promise<boolean | void> | boolean | void
   cancelPendingAutosave?: () => void
-  saveLocalDraft?: (options?: { silent?: boolean; force?: boolean }) => void
+  saveLocalDraft?: (options?: { silent?: boolean; force?: boolean }) => boolean | void
   uploadWithConflictRetry: (requestUpload: () => Promise<Response>) => Promise<Response>
   normalizeSafeImageUrl: (raw: string) => string
   extractImageFileFromClipboard: (clipboardData: DataTransfer | null) => File | null
@@ -269,7 +269,7 @@ export type ServerTempDraftSaveExecutionInput = {
   lastLocalDraftFingerprintRef: MutableRefObject<string>
   cancelPendingAutosave?: () => void
   signalLocalDraftBaselineReady: (signal?: LocalDraftBaselineReadySignal) => void
-  saveLocalDraft?: (options?: { silent?: boolean; force?: boolean }) => void
+  saveLocalDraft?: (options?: { silent?: boolean; force?: boolean }) => boolean | void
   setPostVersion: StudioSetState<number | null>
   setLocalDraftSavedAt: StudioSetState<string>
   setLoadingKey: StudioSetState<string>
@@ -282,10 +282,14 @@ export const hasInvalidCanonicalUrlInput = (postCanonicalUrl: string): boolean =
   return trimmed.length > 0 && !normalizeSafeCanonicalUrl(trimmed)
 }
 
-export const formatInvalidCanonicalDraftSaveNotice = (isEn: boolean): string =>
-  isEn
-    ? `Saved locally. ${adminT("editorCanonicalUrlInvalid", "en")}`
-    : `로컬 초안에 안전 저장했습니다. ${adminT("editorCanonicalUrlInvalid", "ko")}`
+export const formatInvalidCanonicalDraftSaveNotice = (
+  isEn: boolean,
+  localSaved = true
+): string => {
+  const invalidMessage = adminT("editorCanonicalUrlInvalid", isEn ? "en" : "ko")
+  if (!localSaved) return invalidMessage
+  return isEn ? `Saved locally. ${invalidMessage}` : `로컬 초안에 안전 저장했습니다. ${invalidMessage}`
+}
 
 export const executeServerTempDraftSave = async ({
   silent, isEn, normalizedPostId, postTitle, currentPostContent, composed, postVersion,
@@ -299,8 +303,11 @@ export const executeServerTempDraftSave = async ({
 }: ServerTempDraftSaveExecutionInput): Promise<boolean> => {
   if (hasInvalidCanonicalUrlInput(postCanonicalUrl)) {
     if (!silent) {
-      saveLocalDraft?.({ silent: false, force: true })
-      setPublishStatus({ tone: "error", text: formatInvalidCanonicalDraftSaveNotice(isEn) }, "page")
+      const localSaved = saveLocalDraft?.({ silent: false, force: true }) !== false
+      setPublishStatus(
+        { tone: "error", text: formatInvalidCanonicalDraftSaveNotice(isEn, localSaved) },
+        "page"
+      )
     }
     return false
   }

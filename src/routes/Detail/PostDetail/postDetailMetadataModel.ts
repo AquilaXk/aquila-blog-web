@@ -8,6 +8,7 @@ import {
 } from "src/components/MetaConfig"
 import { buildPostOgImagePath } from "src/libs/og/ogUrl"
 import type { TPost } from "src/types"
+import { normalizeSafeCanonicalUrl as normalizeExternalCanonicalUrl } from "src/libs/utils/canonicalUrl"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 
 type JsonLdObject = Record<string, unknown>
@@ -116,19 +117,7 @@ const buildBreadcrumbJsonLd = (
   ],
 })
 
-export const normalizeExternalCanonicalUrl = (rawUrl: string | null | undefined): string => {
-  const trimmed = (rawUrl ?? "").trim()
-  if (!trimmed || trimmed.length > 2048 || /[\u0000-\u0020\u007f]/.test(trimmed)) return ""
-  try {
-    const parsed = new URL(trimmed)
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) {
-      return ""
-    }
-    return parsed.toString()
-  } catch {
-    return ""
-  }
-}
+export { normalizeExternalCanonicalUrl }
 
 export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
   const canonicalPath = toCanonicalPostPath(post.id)

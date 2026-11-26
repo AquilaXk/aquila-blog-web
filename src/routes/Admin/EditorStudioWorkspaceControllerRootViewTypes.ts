@@ -91,7 +91,7 @@ export type EditorStudioDraftLifecycleSlice = {
   localDraftSource: LocalDraftSource
   restoreLocalDraft: () => void
   restoredLocalDraft: LocalDraftFingerprintSnapshot[]
-  saveLocalDraft: (options?: { silent?: boolean; force?: boolean }) => void
+  saveLocalDraft: (options?: { silent?: boolean; force?: boolean }) => boolean | void
   selectLocalDraftCandidate: (key: string) => void
 }
 

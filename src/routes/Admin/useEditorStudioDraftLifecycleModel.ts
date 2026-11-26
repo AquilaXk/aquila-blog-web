@@ -206,14 +206,14 @@ export const useEditorStudioLocalDraftLifecycle = ({
     silent?: boolean
     expectedSource?: LocalDraftSource
     force?: boolean
-  }) => {
-    if (!options?.force && loadingKeyRef.current.length > 0) return
-    if (isPostLoadInFlightRef.current) return
-    if (isPostIdTransitionGatedRef.current) return
+  }): boolean => {
+    if (!options?.force && loadingKeyRef.current.length > 0) return false
+    if (isPostLoadInFlightRef.current) return false
+    if (isPostIdTransitionGatedRef.current) return false
 
     const source = draftSourceRef.current
     if (options?.expectedSource && !localDraftSourcesEqual(options.expectedSource, source)) {
-      return
+      return false
     }
 
     const { core: currentLocalDraftCore, payload } = buildLocalDraftPayloadForSource(
@@ -228,13 +228,16 @@ export const useEditorStudioLocalDraftLifecycle = ({
       currentLocalDraftCore.summary.trim().length > 0 ||
       currentLocalDraftCore.thumbnailUrl.trim().length > 0 ||
       currentLocalDraftCore.tags.length > 0 ||
-      currentLocalDraftCore.category.trim().length > 0
+      currentLocalDraftCore.category.trim().length > 0 ||
+      (currentLocalDraftCore.scheduledAt ?? "").trim().length > 0 ||
+      (currentLocalDraftCore.seriesName ?? "").trim().length > 0 ||
+      (currentLocalDraftCore.canonicalUrl ?? "").trim().length > 0
     if (!hasCurrentDraftContent) {
-      return
+      return false
     }
     const currentLocalDraftFingerprint = buildLocalDraftFingerprint(currentLocalDraftCore)
     if (options?.silent && lastLocalDraftFingerprintRef.current === currentLocalDraftFingerprint) {
-      return
+      return true
     }
 
     const previousOwnAutosave = ownSessionAutosaveRef.current
@@ -248,7 +251,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       ownSessionAutosaveRef.current = previousOwnAutosave
       setLocalDraftSavedAt("")
       setPublishStatus({ tone: "error", text: editorDraftNotice(language, "localSaveFailed") }, "page")
-      return
+      return false
     }
     lastLocalDraftFingerprintRef.current = currentLocalDraftFingerprint
     cachedRestorableDraftRef.current = {
@@ -262,6 +265,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
       const slotLabel = describeLocalDraftSlot(payload, language)
       setPublishStatus({ tone: "success", text: editorDraftLocalSaveDone(language, slotLabel) }, "page")
     }
+    return true
   }, [
     buildLocalDraftFingerprint, getCurrentPostContent, language, lastLocalDraftFingerprintRef,
     localDraftCandidates, localDraftCore, persistLocalDraft, setLocalDraftSavedAt, setPublishStatus,
@@ -331,7 +335,7 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostTags(draft.tags)
     setPostCategory(draft.category)
     setPostVisibility(draft.visibility)
-    setPostScheduledAt?.(draft.scheduledAt ?? "")
+    setPostScheduledAt?.(draft.visibility === "PRIVATE" ? "" : (draft.scheduledAt ?? ""))
     setPostSeriesName?.(draft.seriesName ?? "")
     setPostSeriesOrder?.(draft.seriesOrder ?? null)
     setPostCanonicalUrl?.(draft.canonicalUrl ?? "")
@@ -463,7 +467,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
 
     const hasDraftContent =
       postTitle.trim().length > 0 || postContent.trim().length > 0 || postSummary.trim().length > 0 ||
-      postThumbnailUrl.trim().length > 0 || postTags.length > 0 || postCategory.trim().length > 0
+      postThumbnailUrl.trim().length > 0 || postTags.length > 0 || postCategory.trim().length > 0 ||
+      postScheduledAt.trim().length > 0 || postSeriesName.trim().length > 0 || postCanonicalUrl.trim().length > 0
 
     let pendingRestorableDraftFingerprint: string | null = null
     const cached = cachedRestorableDraftRef.current
@@ -527,8 +532,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
   }, [
     baselineReadyEpoch, buildLocalDraftFingerprint, dedupeStrings, draftSource,
     isPostIdTransitionGated, isPostLoadInFlight, lastLocalDraftFingerprintRef, loadingKey,
-    localDraftCandidates, localDraftFingerprint, normalizeCategoryValue, postCategory,
-    postContent, postLoadInFlightEpoch, postSummary, postSummarySource, summaryIntent,
+    localDraftCandidates, localDraftFingerprint, normalizeCategoryValue, postCanonicalUrl, postCategory,
+    postContent, postLoadInFlightEpoch, postScheduledAt, postSeriesName, postSummary, postSummarySource, summaryIntent,
     postTags, postThumbnailUrl, postTitle, readLocalDraft, saveLocalDraft,
   ])
 

@@ -3,6 +3,7 @@ import { normalizeMetaItems } from "src/apis/backend/posts/PostApiMappers"
 import { hasNonCanonicalPostImageSource } from "src/libs/markdown/postImageMarkdownPolicy"
 import { isCanonicalPostImageUploadUrl } from "src/libs/markdown/postImageUrlPolicy"
 import { normalizeCategoryValue } from "src/libs/utils"
+import { CANONICAL_URL_MAX_LENGTH, normalizeSafeCanonicalUrl } from "src/libs/utils/canonicalUrl"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import {
   DEFAULT_THUMBNAIL_FOCUS_X,
@@ -88,23 +89,7 @@ export const PREVIEW_SUMMARY_MAX_LENGTH = 150
 export const PREVIEW_SUMMARY_MAX_CONTENT_LENGTH = 50_000
 export const POST_CONTENT_MAX_LENGTH = 500_000
 export const SERIES_NAME_MAX_LENGTH = 120
-export const CANONICAL_URL_MAX_LENGTH = 2048
-
-export const normalizeSafeCanonicalUrl = (raw: string): string => {
-  const trimmed = raw.trim()
-  if (!trimmed || trimmed.length > CANONICAL_URL_MAX_LENGTH || /[\u0000-\u0020\u007f]/.test(trimmed)) {
-    return ""
-  }
-  try {
-    const parsed = new URL(trimmed)
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) {
-      return ""
-    }
-    return parsed.toString()
-  } catch {
-    return ""
-  }
-}
+export { CANONICAL_URL_MAX_LENGTH, normalizeSafeCanonicalUrl }
 
 const normalizeMetaScalar = (raw: string) => raw.trim().replace(/^['"]|['"]$/g, "")
 
