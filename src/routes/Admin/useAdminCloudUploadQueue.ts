@@ -193,9 +193,9 @@ export const useAdminCloudUploadQueue = ({
 
           const displayUploaded = preferClientFilenameForUploadedFile(uploaded, nextUpload.name)
           updateCachedFileQueries(displayUploaded)
-          callbacksRef.current.onUploadSuccess(displayUploaded)
-          callbacksRef.current.onNotice("")
           if (mountedRef.current) {
+            callbacksRef.current.onUploadSuccess(displayUploaded)
+            callbacksRef.current.onNotice("")
             setUploadQueue((current) =>
               applyUploadQueueSuccess(current, nextUpload.id, displayUploaded.id)
             )
@@ -220,13 +220,17 @@ export const useAdminCloudUploadQueue = ({
                   : "전송 일시 중단됨"
                 : resolveCloudErrorMessage(error, lang)
             callbacksRef.current.onNotice(
-              isExplicitUserCancel || aborted
+              isExplicitUserCancel
                 ? lang === "en"
                   ? `${nextUpload.name} upload cancelled`
                   : `${nextUpload.name} 업로드 취소`
-                : lang === "en"
-                  ? `${nextUpload.name} upload failed: ${failureMessage}`
-                  : `${nextUpload.name} 업로드 실패: ${failureMessage}`
+                : aborted
+                  ? lang === "en"
+                    ? `${nextUpload.name} upload paused`
+                    : `${nextUpload.name} 업로드 일시 중단`
+                  : lang === "en"
+                    ? `${nextUpload.name} upload failed: ${failureMessage}`
+                    : `${nextUpload.name} 업로드 실패: ${failureMessage}`
             )
             setUploadQueue((current) =>
               applyUploadQueueFailure(

@@ -111,11 +111,15 @@ export const CloudInspectorVideoSection = ({
   const isMountedRef = useRef(false)
   const activeFileIdRef = useRef<number | null>(fileId)
   activeFileIdRef.current = fileId
+  const tokenLoadSeqRef = useRef(0)
 
   const loadPlaybackTokens = useCallback(async (targetId: number) => {
+    const requestSeq = ++tokenLoadSeqRef.current
     setIsLoadingTokens(true)
     try {
       const data = await listCloudExternalPlaybackTokens(targetId)
+      if (!isMountedRef.current || activeFileIdRef.current !== targetId) return
+      if (tokenLoadSeqRef.current !== requestSeq) return
       setPlaybackTokens(
         (data || []).map((item) => ({
           id: Number(item.id || 0),
@@ -125,16 +129,26 @@ export const CloudInspectorVideoSection = ({
         }))
       )
     } catch {
+      if (!isMountedRef.current || activeFileIdRef.current !== targetId) return
+      if (tokenLoadSeqRef.current !== requestSeq) return
       setPlaybackTokens([])
     } finally {
-      setIsLoadingTokens(false)
+      if (
+        isMountedRef.current &&
+        activeFileIdRef.current === targetId &&
+        tokenLoadSeqRef.current === requestSeq
+      ) {
+        setIsLoadingTokens(false)
+      }
     }
   }, [])
 
   useEffect(() => {
     isMountedRef.current = true
     activeFileIdRef.current = fileId
+    tokenLoadSeqRef.current += 1
     setCommandState(null)
+    setPlaybackTokens([])
     void loadPlaybackTokens(fileId)
     return () => {
       isMountedRef.current = false
@@ -174,21 +188,26 @@ export const CloudInspectorVideoSection = ({
   }
 
   const handleRevokeToken = async (tokenId: number) => {
+    const targetId = fileId
     try {
-      await revokeCloudExternalPlaybackToken(fileId, tokenId)
+      await revokeCloudExternalPlaybackToken(targetId, tokenId)
+      if (!isMountedRef.current || activeFileIdRef.current !== targetId) return
       setPlaybackTokens((current) => current.filter((token) => token.id !== tokenId))
       onToast?.({
         tone: "success",
         text: isEn ? "Revoked playback token." : "재생 토큰을 폐기했습니다.",
       })
     } catch (err) {
+      if (!isMountedRef.current || activeFileIdRef.current !== targetId) return
       onToast?.({ tone: "error", text: toUserFacingMessage(err) })
     }
   }
 
   const handleRevokeAllTokens = async () => {
+    const targetId = fileId
     try {
-      const res = await revokeAllCloudExternalPlaybackTokens(fileId)
+      const res = await revokeAllCloudExternalPlaybackTokens(targetId)
+      if (!isMountedRef.current || activeFileIdRef.current !== targetId) return
       setPlaybackTokens([])
       onToast?.({
         tone: "success",
@@ -197,6 +216,7 @@ export const CloudInspectorVideoSection = ({
           : `${res.revokedCount}개의 재생 토큰을 모두 폐기했습니다.`,
       })
     } catch (err) {
+      if (!isMountedRef.current || activeFileIdRef.current !== targetId) return
       onToast?.({ tone: "error", text: toUserFacingMessage(err) })
     }
   }

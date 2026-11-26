@@ -1,6 +1,13 @@
 // 참조 구현: strapi/strapi (MIT), transloadit/uppy (MIT), TryGhost/Ghost (MIT), felixmosh/bull-board (MIT)
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { expect, test } from "@playwright/test"
+import { act, createElement, type ComponentType } from "react"
+import { createRoot } from "react-dom/client"
+import { LanguageProvider as RawLanguageProvider } from "../../src/libs/language"
 import { validateCloudFileBeforeUpload } from "../../src/routes/Admin/cloudFileSignatureGuard"
+import { useAdminCloudUploadQueue } from "../../src/routes/Admin/useAdminCloudUploadQueue"
+import { createMinimalRootContainer, withWindowStorage } from "./helpers/editorStudioTestHarness"
+import { wrapPlaywrightJsxComponent } from "./helpers/materializePlaywrightJsx"
 import { MAX_SVG_MARKUP_BYTES, parseSvgDimensionsFromMarkup } from "../../src/routes/Admin/AdminCloudWorkspaceModel"
 import { getStrapiAssetIcon, StrapiFileCodeIcon, StrapiFilePdfIcon, StrapiHeadphonesIcon, StrapiImageIcon, StrapiPlayIcon } from "../../src/routes/Admin/adminStrapiIcons"
 import * as AdminProfilePersistenceModel from "../../src/routes/Admin/AdminProfilePersistenceModel"
@@ -78,6 +85,66 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
       { type: "image/svg+xml" }
     )
     expect((await validateCloudFileBeforeUpload(jsHrefSvg)).ok).toBe(false)
+
+    // 네임스페이스 접두 XSS 태그 및 data:image/svg+xml 차단 + .sh 텍스트 허용 / 실행 바이너리 위장 .sh 차단
+    const nsScriptSvg = new File(
+      [new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" xmlns:h="http://www.w3.org/1999/xhtml"><h:script>alert(1)</h:script></svg>')],
+      "xss-ns-script.svg",
+      { type: "image/svg+xml" }
+    )
+    expect((await validateCloudFileBeforeUpload(nsScriptSvg)).ok).toBe(false)
+    expect((await validateCloudFileBeforeUpload(nsScriptSvg, "en")).ok).toBe(false)
+
+    const nsForeignSvg = new File(
+      [new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" xmlns:x="http://www.w3.org/2000/svg"><x:foreignObject><body/></x:foreignObject></svg>')],
+      "xss-ns-foreign.svg",
+      { type: "image/svg+xml" }
+    )
+    expect((await validateCloudFileBeforeUpload(nsForeignSvg)).ok).toBe(false)
+
+    const nsIframeSvg = new File(
+      [new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" xmlns:x="http://www.w3.org/1999/xhtml"><x:iframe src="https://evil.example"/></svg>')],
+      "xss-ns-iframe.svg",
+      { type: "image/svg+xml" }
+    )
+    expect((await validateCloudFileBeforeUpload(nsIframeSvg)).ok).toBe(false)
+
+    const dataSvgUri = new File(
+      [new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/svg+xml;utf8,<svg/>"/></svg>')],
+      "xss-data-svg.svg",
+      { type: "image/svg+xml" }
+    )
+    expect((await validateCloudFileBeforeUpload(dataSvgUri)).ok).toBe(false)
+
+    const validSh = new File(
+      [new TextEncoder().encode("#!/usr/bin/env bash\necho ok\n")],
+      "deploy.sh",
+      { type: "application/x-sh" }
+    )
+    expect(await validateCloudFileBeforeUpload(validSh)).toEqual({ ok: true })
+    const validShNoMime = new File([new TextEncoder().encode("echo hi\n")], "run.sh", { type: "" })
+    expect(await validateCloudFileBeforeUpload(validShNoMime)).toEqual({ ok: true })
+
+    const elfSpoofedSh = new File(
+      [new Uint8Array([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0])],
+      "evil-elf.sh",
+      { type: "text/plain" }
+    )
+    expect((await validateCloudFileBeforeUpload(elfSpoofedSh)).ok).toBe(false)
+    const machoSpoofedSh = new File(
+      [new Uint8Array([0xcf, 0xfa, 0xed, 0xfe, 0, 0, 0, 0])],
+      "evil-macho.sh",
+      { type: "text/plain" }
+    )
+    expect((await validateCloudFileBeforeUpload(machoSpoofedSh)).ok).toBe(false)
+    const peSpoofedSh = new File(
+      [new Uint8Array([0x4d, 0x5a, 0x90, 0x00])],
+      "evil-pe.sh",
+      { type: "text/plain" }
+    )
+    expect((await validateCloudFileBeforeUpload(peSpoofedSh)).ok).toBe(false)
+    const nulSh = new File([new Uint8Array([0x61, 0x00, 0x62])], "nul.sh", { type: "text/plain" })
+    expect((await validateCloudFileBeforeUpload(nulSh)).ok).toBe(false)
 
     // 영어 모드(language = "en") 시그니처·용량·텍스트 검사 오류 메시지 확인
     const enFakePdf = await validateCloudFileBeforeUpload(fakePdf, "en")
@@ -257,5 +324,169 @@ test.describe("Track 3 & 4 보안 가드 · SSR 정규화 · 메모리 상한 �
     expect(getStrapiAssetIcon("audio/mpeg", "voice.mp3")).toBe(StrapiHeadphonesIcon)
     expect(getStrapiAssetIcon("application/pdf", "spec.pdf")).toBe(StrapiFilePdfIcon)
     expect(getStrapiAssetIcon("text/markdown", "readme.md")).toBe(StrapiFileCodeIcon)
+  })
+
+  test("useAdminCloudUploadQueue는 비사용자 abort와 명시적 취소, 언마운트 완료 알림을 구분해 처리한다", async () => {
+    const LanguageProvider = wrapPlaywrightJsxComponent(RawLanguageProvider) as ComponentType<{
+      initialLanguage?: "ko" | "en"
+      children?: unknown
+    }>
+    const prevXhr = (globalThis as Record<string, unknown>).XMLHttpRequest
+    const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
+
+    type MockXhrInstance = {
+      upload: { onprogress: ((ev: { loaded: number; total: number; lengthComputable: boolean }) => void) | null }
+      onload: (() => void) | null
+      onerror: (() => void) | null
+      ontimeout: (() => void) | null
+      onabort: (() => void) | null
+      status: number
+      responseText: string
+      timeout: number
+      withCredentials: boolean
+      open: (method: string, url: string, asyncFlag: boolean) => void
+      setRequestHeader: (k: string, v: string) => void
+      getResponseHeader: (k: string) => string | null
+      send: (body: unknown) => void
+      abort: () => void
+    }
+    const xhrInstances: MockXhrInstance[] = []
+    class MockXMLHttpRequest implements MockXhrInstance {
+      upload = { onprogress: null }
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      ontimeout: (() => void) | null = null
+      onabort: (() => void) | null = null
+      status = 201
+      responseText = ""
+      timeout = 0
+      withCredentials = false
+      open() {}
+      setRequestHeader() {}
+      getResponseHeader() {
+        return null
+      }
+      send() {
+        xhrInstances.push(this)
+      }
+      abort() {
+        this.onabort?.()
+      }
+    }
+
+    ;(globalThis as Record<string, unknown>).XMLHttpRequest = MockXMLHttpRequest
+    try {
+      await withWindowStorage(async () => {
+        Object.defineProperty(globalThis, "document", {
+          configurable: true,
+          writable: true,
+          value: (globalThis as unknown as { window: { document: unknown } }).window.document,
+        })
+        Object.assign((globalThis as unknown as { document: Record<string, unknown> }).document, {
+          documentElement: { lang: "ko-KR" },
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+        })
+        const runScenario = async (language: "ko" | "en") => {
+          xhrInstances.length = 0
+          const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+          const notices: string[] = []
+          const successes: number[] = []
+          let queueApi!: ReturnType<typeof useAdminCloudUploadQueue>
+
+          const Probe = () => {
+            queueApi = useAdminCloudUploadQueue({
+              activeFolderPath: "",
+              onUploadSuccess: (file) => successes.push(file.id),
+              onNotice: (msg) => notices.push(msg),
+              onToast: () => {},
+            })
+            return null
+          }
+
+          const root = createRoot(createMinimalRootContainer() as unknown as Element)
+          await act(async () => {
+            root.render(
+              createElement(
+                QueryClientProvider,
+                { client: queryClient },
+                createElement(
+                  LanguageProvider,
+                  { initialLanguage: language },
+                  createElement(Probe)
+                )
+              )
+            )
+          })
+
+          const scriptFile = new File([new TextEncoder().encode("#!/bin/sh\necho hi\n")], "deploy.sh", {
+            type: "text/plain",
+          })
+
+          // 1) 비사용자 abort (!isExplicitUserCancel && aborted) -> 일시 중단 notice
+          await act(async () => {
+            await queueApi.queueUploadFiles([scriptFile])
+          })
+          await act(async () => {
+            await Promise.resolve()
+          })
+          expect(xhrInstances.length).toBe(1)
+          await act(async () => {
+            xhrInstances[0]!.onabort?.()
+            await Promise.resolve()
+          })
+          if (language === "ko") {
+            expect(notices.at(-1)).toBe("deploy.sh 업로드 일시 중단")
+            expect(queueApi.uploadQueue[0]?.message).toBe("전송 일시 중단됨")
+          } else {
+            expect(notices.at(-1)).toBe("deploy.sh upload paused")
+            expect(queueApi.uploadQueue[0]?.message).toBe("Paused on navigation")
+          }
+          expect(queueApi.uploadQueue[0]?.status).toBe("cancelled")
+
+          // 2) 명시적 사용자 취소 (handleCancelUpload) -> 취소 notice
+          await act(async () => {
+            await queueApi.queueUploadFiles([scriptFile])
+          })
+          await act(async () => {
+            await Promise.resolve()
+          })
+          expect(xhrInstances.length).toBe(2)
+          await act(async () => {
+            queueApi.handleCancelUpload(queueApi.uploadQueue[1]!)
+            await Promise.resolve()
+          })
+          if (language === "ko") {
+            expect(notices.at(-1)).toBe("deploy.sh 업로드 취소")
+            expect(queueApi.uploadQueue[1]?.message).toBe("사용자가 취소함")
+          } else {
+            expect(notices.at(-1)).toBe("deploy.sh upload cancelled")
+            expect(queueApi.uploadQueue[1]?.message).toBe("Cancelled by user")
+          }
+
+          // 3) 언마운트 시 완료·중단 콜백 미호출
+          await act(async () => {
+            await queueApi.queueUploadFiles([scriptFile])
+          })
+          await act(async () => {
+            await Promise.resolve()
+          })
+          const noticeCountBeforeUnmount = notices.length
+          await act(async () => {
+            root.unmount()
+            await Promise.resolve()
+          })
+          expect(notices.length).toBe(noticeCountBeforeUnmount)
+          expect(successes).toEqual([])
+        }
+
+        await runScenario("ko")
+        await runScenario("en")
+      })
+    } finally {
+      ;(globalThis as Record<string, unknown>).XMLHttpRequest = prevXhr
+      if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
+      else delete (globalThis as Record<string, unknown>).document
+    }
   })
 })

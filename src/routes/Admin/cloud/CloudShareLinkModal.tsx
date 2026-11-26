@@ -72,6 +72,26 @@ export const CloudShareLinkModal = ({
   const fileId = file?.id ?? 0
   const isVideo = file?.mediaKind === "VIDEO"
 
+  const isMountedRef = useRef(true)
+  const latestContextRef = useRef({ open, fileId })
+  latestContextRef.current = { open, fileId }
+  const refreshSeqRef = useRef(0)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const isCurrentFileOpen = useCallback(
+    (targetFileId: number) =>
+      isMountedRef.current &&
+      latestContextRef.current.open &&
+      latestContextRef.current.fileId === targetFileId,
+    []
+  )
+
   const getTtlLabel = (ttl: CloudShareLinkTtlSeconds) => {
     if (ttl === 3600) return t.shareTtl1h
     if (ttl === 21600) return t.shareTtl6h
@@ -79,33 +99,52 @@ export const CloudShareLinkModal = ({
     return t.shareTtl24h
   }
 
-  const refreshActiveTokens = useCallback(async () => {
-    if (!fileId) return
-    setLoadingTokens(true)
-    try {
-      const shareList = await listCloudShareLinks(fileId)
-      setActiveShareTokens(shareList)
-      if (isVideo) {
-        const playbackList = await listCloudExternalPlaybackTokens(fileId)
-        setActivePlaybackTokens(playbackList)
-      } else {
-        setActivePlaybackTokens([])
+  const refreshActiveTokens = useCallback(
+    async (targetFileId = fileId, targetIsVideo = isVideo) => {
+      if (!targetFileId) return
+      const requestSeq = ++refreshSeqRef.current
+      const isStale = () =>
+        !isMountedRef.current ||
+        !latestContextRef.current.open ||
+        latestContextRef.current.fileId !== targetFileId ||
+        refreshSeqRef.current !== requestSeq
+
+      setLoadingTokens(true)
+      try {
+        const shareList = await listCloudShareLinks(targetFileId)
+        if (isStale()) return
+        setActiveShareTokens(shareList)
+        if (targetIsVideo) {
+          const playbackList = await listCloudExternalPlaybackTokens(targetFileId)
+          if (isStale()) return
+          setActivePlaybackTokens(playbackList)
+        } else {
+          setActivePlaybackTokens([])
+        }
+      } catch {
+        if (isStale()) return
+      } finally {
+        if (!isStale()) {
+          setLoadingTokens(false)
+        }
       }
-    } catch {
-      // 목록 조회 실패 시 기존 상태 유지
-    } finally {
-      setLoadingTokens(false)
-    }
-  }, [fileId, isVideo])
+    },
+    [fileId, isVideo]
+  )
 
   useEffect(() => {
+    refreshSeqRef.current += 1
+    setActiveShareTokens([])
+    setActivePlaybackTokens([])
+    setLoadingTokens(false)
+    setBusy(false)
     if (!open || !fileId) return
     setActiveTab("external")
     setIssuedShare(null)
     setIssuedPlayer(null)
     setCopiedTarget("")
-    void refreshActiveTokens()
-  }, [fileId, open, refreshActiveTokens])
+    void refreshActiveTokens(fileId, isVideo)
+  }, [fileId, isVideo, open, refreshActiveTokens])
 
   if (!open || !file) return null
 
@@ -114,7 +153,7 @@ export const CloudShareLinkModal = ({
       ? `${window.location.origin}${getCloudFileContentUrl(file.id)}`
       : getCloudFileContentUrl(file.id)
 
-  const copyTextToClipboard = async (label: string, text: string) => {
+  const copyTextToClipboard = async (label: string, text: string, targetFileId = file.id) => {
     try {
       if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
         throw new Error(
@@ -124,42 +163,58 @@ export const CloudShareLinkModal = ({
         )
       }
       await navigator.clipboard.writeText(text)
+      if (!isCurrentFileOpen(targetFileId)) return
       setCopiedTarget(label)
       onToast({ tone: "success", text: `${label} — ${t.shareCopied}` })
     } catch (error) {
+      if (!isCurrentFileOpen(targetFileId)) return
       onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
     }
   }
 
   const handleIssueShare = async () => {
+    const targetFileId = file.id
+    const targetIsVideo = isVideo
     setBusy(true)
     try {
-      const issued = await issueCloudShareLink(file.id, selectedTtl)
+      const issued = await issueCloudShareLink(targetFileId, selectedTtl)
+      if (!isCurrentFileOpen(targetFileId)) return
       setIssuedShare(issued)
-      await copyTextToClipboard(t.shareTabExternal, issued.contentUrl)
-      await refreshActiveTokens()
+      await copyTextToClipboard(t.shareTabExternal, issued.contentUrl, targetFileId)
+      if (!isCurrentFileOpen(targetFileId)) return
+      await refreshActiveTokens(targetFileId, targetIsVideo)
     } catch (error) {
+      if (!isCurrentFileOpen(targetFileId)) return
       onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
     } finally {
-      setBusy(false)
+      if (isCurrentFileOpen(targetFileId)) {
+        setBusy(false)
+      }
     }
   }
 
   const handleCopyPlayerCommand = async (player: "iina" | "mpv") => {
+    const targetFileId = file.id
+    const targetIsVideo = isVideo
     setBusy(true)
     try {
-      const issued = await issueCloudExternalPlaybackToken(file.id, selectedTtl)
+      const issued = await issueCloudExternalPlaybackToken(targetFileId, selectedTtl)
+      if (!isCurrentFileOpen(targetFileId)) return
       setIssuedPlayer(issued)
       const cmd =
         player === "iina"
           ? `open "iina://weblink?url=${encodeURIComponent(issued.contentUrl)}"`
           : `mpv ${quotePosixShellArg(issued.contentUrl)}`
-      await copyTextToClipboard(player.toUpperCase(), cmd)
-      await refreshActiveTokens()
+      await copyTextToClipboard(player.toUpperCase(), cmd, targetFileId)
+      if (!isCurrentFileOpen(targetFileId)) return
+      await refreshActiveTokens(targetFileId, targetIsVideo)
     } catch (error) {
+      if (!isCurrentFileOpen(targetFileId)) return
       onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
     } finally {
-      setBusy(false)
+      if (isCurrentFileOpen(targetFileId)) {
+        setBusy(false)
+      }
     }
   }
 
@@ -319,18 +374,24 @@ export const CloudShareLinkModal = ({
                     type="button"
                     disabled={busy || loadingTokens}
                     onClick={async () => {
+                      const targetFileId = file.id
+                      const targetIsVideo = isVideo
                       setBusy(true)
                       try {
                         if (activeTab === "player") {
-                          await revokeAllCloudExternalPlaybackTokens(file.id)
+                          await revokeAllCloudExternalPlaybackTokens(targetFileId)
                         } else {
-                          await revokeAllCloudShareLinks(file.id)
+                          await revokeAllCloudShareLinks(targetFileId)
                         }
-                        await refreshActiveTokens()
+                        if (!isCurrentFileOpen(targetFileId)) return
+                        await refreshActiveTokens(targetFileId, targetIsVideo)
                       } catch (error) {
+                        if (!isCurrentFileOpen(targetFileId)) return
                         onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
                       } finally {
-                        setBusy(false)
+                        if (isCurrentFileOpen(targetFileId)) {
+                          setBusy(false)
+                        }
                       }
                     }}
                   >
@@ -354,18 +415,24 @@ export const CloudShareLinkModal = ({
                         disabled={busy || !tokenItem.id}
                         onClick={async () => {
                           if (!tokenItem.id) return
+                          const targetFileId = file.id
+                          const targetIsVideo = isVideo
                           setBusy(true)
                           try {
                             if (activeTab === "player") {
-                              await revokeCloudExternalPlaybackToken(file.id, tokenItem.id)
+                              await revokeCloudExternalPlaybackToken(targetFileId, tokenItem.id)
                             } else {
-                              await revokeCloudShareLink(file.id, tokenItem.id)
+                              await revokeCloudShareLink(targetFileId, tokenItem.id)
                             }
-                            await refreshActiveTokens()
+                            if (!isCurrentFileOpen(targetFileId)) return
+                            await refreshActiveTokens(targetFileId, targetIsVideo)
                           } catch (error) {
+                            if (!isCurrentFileOpen(targetFileId)) return
                             onToast({ tone: "error", text: resolveCloudErrorMessage(error, language) })
                           } finally {
-                            setBusy(false)
+                            if (isCurrentFileOpen(targetFileId)) {
+                              setBusy(false)
+                            }
                           }
                         }}
                       >

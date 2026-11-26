@@ -171,11 +171,21 @@ const setupAdminCloudMocks = async (
     failVideoPartFailureCounts?: Record<number, number>
     failVideoSessionGetOnceStatus?: number
     externalPlaybackTokenDelayMs?: number
+    externalPlaybackTokensListDelayMsByFileId?: Record<string, number>
     initialFiles?: CloudFileFixture[]
+    initialPlaybackTokensByFileId?: Record<
+      string,
+      Array<{ id: number; fileId: number; purpose: "EXTERNAL_PLAYBACK"; createdAt: string; expiresAt: string }>
+    >
+    initialShareTokensByFileId?: Record<
+      string,
+      Array<{ id: number; fileId: number; purpose: "SHARE_LINK"; createdAt: string; expiresAt: string }>
+    >
     invalidPdfIds?: string[]
     listDelayMs?: number
     lookupOnlyFiles?: CloudFileFixture[]
     normalizeVideoSessionFilename?: boolean
+    shareLinksDelayMsByFileId?: Record<string, number>
     svgBodiesById?: Record<string, string>
     uploadResponseFilenames?: Record<string, string>
     videoCompletedFileId?: number
@@ -202,11 +212,11 @@ const setupAdminCloudMocks = async (
   const shareTokensByFileId = new Map<
     string,
     Array<{ id: number; fileId: number; purpose: "SHARE_LINK"; createdAt: string; expiresAt: string }>
-  >()
+  >(Object.entries(options.initialShareTokensByFileId ?? {}).map(([k, v]) => [k, v.map((item) => ({ ...item }))]))
   const playbackTokensByFileId = new Map<
     string,
     Array<{ id: number; fileId: number; purpose: "EXTERNAL_PLAYBACK"; createdAt: string; expiresAt: string }>
-  >()
+  >(Object.entries(options.initialPlaybackTokensByFileId ?? {}).map(([k, v]) => [k, v.map((item) => ({ ...item }))]))
   const uploadedFiles: CloudFileFixture[] = []
   const failedDeleteIds = new Set(options.failDeleteIds ?? [])
   const failedUploadNames = new Set(options.failUploadNames ?? [])
@@ -351,6 +361,8 @@ const setupAdminCloudMocks = async (
     const method = request.method()
     const currentTokens = playbackTokensByFileId.get(fileId) ?? []
     if (method === "GET") {
+      const tokenListDelay = options.externalPlaybackTokensListDelayMsByFileId?.[fileId]
+      if (tokenListDelay) await delay(tokenListDelay)
       await fulfillJson(route, { tokens: currentTokens })
       return
     }
@@ -715,6 +727,8 @@ const setupAdminCloudMocks = async (
     const currentTokens = shareTokensByFileId.get(fileId) ?? []
 
     if (method === "GET") {
+      const shareDelay = options.shareLinksDelayMsByFileId?.[fileId]
+      if (shareDelay) await delay(shareDelay)
       await fulfillJson(route, { tokens: currentTokens })
       return
     }
@@ -2235,5 +2249,107 @@ test.describe("관리자 클라우드", () => {
     await expect(page.getByRole("row", { name: /photos-unrelated\.png/ })).toHaveCount(0)
     await expect(page.locator('button[title="/photos"]')).toHaveCount(0)
     await expect(page.locator("tbody tr").first()).toContainText("docs-older.pdf")
+  })
+
+  test("CloudShareLinkModal과 CloudInspectorVideoSection은 파일 전환 시 이전 토큰을 즉시 비우고 지연 응답 덮어쓰기를 차단하며 .sh 업로드를 허용한다", async ({
+    page,
+  }) => {
+    const secondVideo: CloudFileFixture = {
+      id: 105,
+      ownerMemberId: 1,
+      originalFilename: "release-demo.mp4",
+      contentType: "video/mp4",
+      byteSize: 4_194_304,
+      mediaKind: "VIDEO",
+      folderPath: "/video",
+      createdAt: "2026-06-12T12:00:00Z",
+      modifiedAt: "2026-06-12T12:00:00Z",
+    }
+    const mocks = await setupAdminCloudMocks(page, {
+      initialFiles: [...CLOUD_FILES, secondVideo],
+      initialShareTokensByFileId: {
+        "102": [
+          {
+            id: 9501,
+            fileId: 102,
+            purpose: "SHARE_LINK",
+            createdAt: "2026-06-26T00:00:00Z",
+            expiresAt: "2026-06-27T00:00:00Z",
+          },
+        ],
+        "101": [],
+      },
+      shareLinksDelayMsByFileId: {
+        "102": 350,
+      },
+      initialPlaybackTokensByFileId: {
+        "103": [
+          {
+            id: 9601,
+            fileId: 103,
+            purpose: "EXTERNAL_PLAYBACK",
+            createdAt: "2026-06-26T00:00:00Z",
+            expiresAt: "2026-06-27T00:00:00Z",
+          },
+        ],
+        "105": [
+          {
+            id: 9602,
+            fileId: 105,
+            purpose: "EXTERNAL_PLAYBACK",
+            createdAt: "2026-06-26T00:00:00Z",
+            expiresAt: "2026-06-27T00:00:00Z",
+          },
+        ],
+      },
+      externalPlaybackTokensListDelayMsByFileId: {
+        "103": 400,
+      },
+    })
+
+    await page.goto("/admin/cloud")
+
+    // 1) CloudShareLinkModal: 102 지연 응답 중 닫고 101로 열면 9501이 남지 않고 지연 응답도 덮어쓰지 않음
+    await page.locator('button[title="home-server-rack.png"]').click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+    const shareDialog = page.getByRole("dialog", { name: "공유 링크 관리" })
+    await expect(shareDialog.getByText(/#9501/)).toBeVisible()
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+    await expect(shareDialog).toHaveCount(0)
+
+    await page.locator('button[title="운영 점검 리포트.pdf"]').click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+    await expect(shareDialog).toBeVisible()
+    await expect(shareDialog.getByText(/#9501/)).toHaveCount(0)
+    await expect(shareDialog.getByText("발급된 활성 링크가 없습니다.")).toBeVisible()
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+
+    // 102 지연 요청 발생 -> 완료 전 닫기 -> 101 즉시 열기 -> 102 응답 도착 후에도 9501 미노출
+    await page.locator('button[title="home-server-rack.png"]').click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+    await page.locator('button[title="운영 점검 리포트.pdf"]').click()
+    await page.getByLabel("클라우드 상세정보").getByRole("button", { name: "공유 링크" }).click()
+    await page.waitForTimeout(450)
+    await expect(shareDialog.getByText(/#9501/)).toHaveCount(0)
+    await expect(shareDialog.getByText("발급된 활성 링크가 없습니다.")).toBeVisible()
+    await shareDialog.getByRole("button", { name: "닫기" }).click()
+
+    // 2) CloudInspectorVideoSection: 103 지연 조회 중 105로 전환하면 9602만 표시되고 9601로 덮어쓰지 않음
+    await page.locator('button[title="deploy-walkthrough.mp4"]').click()
+    await page.locator('button[title="release-demo.mp4"]').click()
+    const detailPanel = page.getByLabel("클라우드 상세정보")
+    await expect(detailPanel.getByText(/#9602/)).toBeVisible()
+    await page.waitForTimeout(500)
+    await expect(detailPanel.getByText(/#9602/)).toBeVisible()
+    await expect(detailPanel.getByText(/#9601/)).toHaveCount(0)
+
+    // 3) .sh 텍스트 스크립트 업로드 허용 확인
+    await page.getByLabel("클라우드 파일 업로드").setInputFiles({
+      name: "deploy.sh",
+      mimeType: "application/x-sh",
+      buffer: Buffer.from("#!/usr/bin/env bash\necho deploy\n"),
+    })
+    await expect.poll(() => mocks.uploadedNames).toContain("deploy.sh")
   })
 })
