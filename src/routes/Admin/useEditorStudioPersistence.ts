@@ -331,7 +331,8 @@ export const useEditorStudioPersistence = ({
         () => refreshPublicPostReadViews(createWritePostId.postId),
         isEn
           ? `Created: ${response.msg} (Visibility: ${visibilityText})`
-          : `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`
+          : `작성 완료: ${response.msg} (공개 범위: ${visibilityText})`,
+        language
       )
       setPublishStatus(nextPublishNotice, "page")
       setLoadingKey("")
@@ -425,10 +426,7 @@ export const useEditorStudioPersistence = ({
         setLocalDraftSavedAt("")
       }
       setPublishStatus(
-        await resolvePostSaveRefresh(
-          () => refreshPublicPostReadViews(postId),
-          isEn ? `Updated: ${response.msg}` : `수정 완료: ${response.msg}`
-        ),
+        await resolvePostSaveRefresh(() => refreshPublicPostReadViews(postId), isEn ? `Updated: ${response.msg}` : `수정 완료: ${response.msg}`, language),
         "page"
       )
       setResult(pretty(response))
@@ -494,10 +492,7 @@ export const useEditorStudioPersistence = ({
         setLocalDraftSavedAt("")
       }
       setPublishStatus(
-        await resolvePostSaveRefresh(
-          () => refreshPublicPostReadViews(postId),
-          adminT("editorSaveTempDone", language)
-        ),
+        await resolvePostSaveRefresh(() => refreshPublicPostReadViews(postId), adminT("editorSaveTempDone", language), language),
         "page"
       )
       setResult(pretty(response))
@@ -524,17 +519,18 @@ export const useEditorStudioPersistence = ({
       if (editorMode !== "edit" || !normalizedPostId) return false
       if (loadingKey || tempDraftSaveInFlightRef.current) {
         if (!silent) {
-          resolveAuthoringMetadataForWrite()
+          const isPublishInFlight =
+            loadingKey === "writePost" || loadingKey === "modifyPost" || loadingKey === "publishTempPost"
+          if (!isPublishInFlight) resolveAuthoringMetadataForWrite()
           saveLocalDraft?.({ silent: false, force: true })
-          setPublishStatus(
-            {
+          if (!isPublishInFlight) {
+            setPublishStatus({
               tone: "success",
               text: isEn
                 ? "Another save is in progress; backed up safely as a browser draft."
                 : "다른 저장·업로드 작업 중이어서 브라우저 로컬 초안에 먼저 안전 저장했습니다.",
-            },
-            "page"
-          )
+            }, "page")
+          }
         }
         return false
       }

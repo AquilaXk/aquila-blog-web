@@ -588,11 +588,11 @@ test.describe("live Markdown writing surface", () => {
 
     const wikilinks = page.locator(".cm-live-wikilink")
     await expect(wikilinks).toHaveCount(2)
-    await expect(wikilinks.first()).toHaveAttribute("aria-label", "Wikilink: Architecture")
+    await expect(wikilinks.first()).toHaveAttribute("aria-label", "위키링크: Architecture")
     await expect(wikilinks.first().locator(".cm-live-wikilink-text")).toHaveText("Architecture")
     await expect(wikilinks.first().locator(".cm-live-wikilink-icon svg")).toBeVisible()
 
-    await expect(wikilinks.nth(1)).toHaveAttribute("aria-label", "Wikilink: User Guide")
+    await expect(wikilinks.nth(1)).toHaveAttribute("aria-label", "위키링크: User Guide")
     await expect(wikilinks.nth(1).locator(".cm-live-wikilink-text")).toHaveText("User Guide")
 
     // Inactive: visible text shows rendered pill labels, not raw brackets

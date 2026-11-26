@@ -1,3 +1,4 @@
+import type { SiteLanguage } from "src/libs/language"
 import { isOffsetInsideFencedCodeBlock } from "./markdownEditorKeyboardModel"
 import { readVisualViewportBounds } from "./markdownEditorLinkUtils"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
@@ -279,7 +280,8 @@ export const computeColorSwatchMutationPlan = (
   value: string,
   selection: { from: number; to: number },
   selectedText: string,
-  token: string
+  token: string,
+  language: SiteLanguage = "ko"
 ): ColorSwatchMutationResult => {
   if (selection.from < selection.to) {
     const existingMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(selectedText)
@@ -309,7 +311,9 @@ export const computeColorSwatchMutationPlan = (
   const bodyOffset = prefixMatch ? prefixMatch[0].length : 0
   const rawBody = lineText.slice(bodyOffset)
   const existingColorMatch = /^\{\{color:([^|{}]+)\|([\s\S]*)\}\}$/.exec(rawBody)
-  const innerText = (existingColorMatch ? existingColorMatch[2] ?? "" : rawBody) || "강조 텍스트"
+  const innerText =
+    (existingColorMatch ? existingColorMatch[2] ?? "" : rawBody) ||
+    (language === "en" ? "Highlighted text" : "강조 텍스트")
   const replacement =
     token === "default" || existingColorMatch?.[1]?.trim() === token
       ? innerText

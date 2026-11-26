@@ -64,15 +64,18 @@ const isPositiveInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value > 0
 
 export const normalizePostRevisionSummaries = (
-  rows: readonly RawPostRevisionSummaryDto[] | unknown
+  rows: readonly RawPostRevisionSummaryDto[] | unknown,
+  language: SiteLanguage = "ko"
 ): PostRevisionSummaryItem[] => {
   if (!Array.isArray(rows)) return []
+  const untitledFallback = language === "en" ? "Untitled" : "제목 없음"
   const normalized: PostRevisionSummaryItem[] = []
   for (const row of rows) {
     if (!row || typeof row !== "object") continue
     const candidate = row as RawPostRevisionSummaryDto
     if (!isPositiveInteger(candidate.id) || !isPositiveInteger(candidate.postId)) continue
-    const title = typeof candidate.title === "string" && candidate.title.trim() ? candidate.title.trim() : "제목 없음"
+    const title =
+      typeof candidate.title === "string" && candidate.title.trim() ? candidate.title.trim() : untitledFallback
     const summaryText =
       typeof candidate.summaryText === "string" && candidate.summaryText.trim()
         ? candidate.summaryText.trim()
@@ -97,7 +100,8 @@ export const normalizePostRevisionSummaries = (
 
 const normalizePostRevisionSnapshot = (
   raw: unknown,
-  fallbackItem?: PostRevisionSummaryItem
+  fallbackItem?: PostRevisionSummaryItem,
+  language: SiteLanguage = "ko"
 ): PostRevisionSnapshotItem | null => {
   if (!raw || typeof raw !== "object") return null
   const candidate =
@@ -107,10 +111,11 @@ const normalizePostRevisionSnapshot = (
   const id = isPositiveInteger(candidate.id) ? candidate.id : fallbackItem?.id
   const postId = isPositiveInteger(candidate.postId) ? candidate.postId : fallbackItem?.postId
   if (!id || !postId || typeof candidate.content !== "string") return null
+  const untitledFallback = language === "en" ? "Untitled" : "제목 없음"
   const title =
     typeof candidate.title === "string" && candidate.title.trim()
       ? candidate.title.trim()
-      : fallbackItem?.title ?? "제목 없음"
+      : fallbackItem?.title ?? untitledFallback
   return {
     id,
     postId,
@@ -196,7 +201,7 @@ export const EditorStudioRevisionHistoryCard = ({
       const rows = await apiFetch<RawPostRevisionSummaryDto[]>(
         `/post/api/v1/adm/posts/${postId}/revisions`
       )
-      setRevisions(normalizePostRevisionSummaries(rows))
+      setRevisions(normalizePostRevisionSummaries(rows, language))
       setHasLoaded(true)
     } catch (error) {
       setErrorText(
@@ -209,7 +214,7 @@ export const EditorStudioRevisionHistoryCard = ({
     } finally {
       setIsLoading(false)
     }
-  }, [isEn, postId])
+  }, [isEn, language, postId])
 
   const handleToggle = useCallback(
     (event: SyntheticEvent<HTMLDetailsElement>) => {
@@ -241,7 +246,7 @@ export const EditorStudioRevisionHistoryCard = ({
         const response = await apiFetch<RawPostRevisionSnapshotDto>(
           `/post/api/v1/adm/posts/${postId}/revisions/${item.id}`
         )
-        const normalized = normalizePostRevisionSnapshot(response, item)
+        const normalized = normalizePostRevisionSnapshot(response, item, language)
         if (!normalized) {
           throw new Error(adminT("editorRevisionLoadError", language))
         }

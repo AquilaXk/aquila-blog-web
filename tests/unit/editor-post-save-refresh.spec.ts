@@ -31,7 +31,14 @@ test("공개 화면 갱신 결과는 확정된 저장 결과를 뒤집지 않는
     tone: "error",
     text: "저장은 완료됐지만 공개 화면 갱신에 실패했습니다. 다시 저장할 필요는 없습니다.",
   })
-  expect(calls).toBe(2)
+  expect(await resolvePostSaveRefresh(async () => {
+    calls += 1
+    throw new Error("provider response must not reach the notice")
+  }, "Updated", "en")).toEqual({
+    tone: "error",
+    text: "Saved, but failed to refresh the public view. No need to save again.",
+  })
+  expect(calls).toBe(3)
 })
 
 test("갱신 요청 지연은 실제 취소되며 저장 재전송 없이 안내한다", async () => {

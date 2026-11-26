@@ -181,12 +181,8 @@ const appendTaskWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDecoration
   const taskPrefix = resolveTaskPrefixRange(ctx.markdownValue, spec.from, spec.to)
   if (isTokenActive(taskPrefix.from, taskPrefix.to, ctx.selections)) return
   const checked = isTaskCheckedRange(ctx.markdownValue, spec.from, taskPrefix.markerTo)
-  pushReplaceDecoration(
-    ctx,
-    Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo) }),
-    spec.from,
-    taskPrefix.markerTo
-  )
+  const language = ctx.state.field(editorLanguageField, false) ?? "ko"
+  pushReplaceDecoration(ctx, Decoration.replace({ widget: new MarkdownTaskWidget(checked, spec.from, taskPrefix.markerTo, language) }), spec.from, taskPrefix.markerTo)
   const trailingCode = ctx.markdownValue.charCodeAt(taskPrefix.markerTo)
   if (trailingCode === 32 || trailingCode === 9) {
     ctx.decorations.push(TASK_SPACE_DECORATION.range(taskPrefix.markerTo, taskPrefix.markerTo + 1))
@@ -223,10 +219,10 @@ const appendActiveAwareWidgetSpec = (spec: ResolvedPreviewSpec, ctx: PlanSpecDec
   }
   if (spec.kind !== "wikilink" && spec.kind !== "quote-mark") return false
   if (isTokenActive(spec.from, spec.to, ctx.selections)) return true
-  const deco =
-    spec.kind === "wikilink"
-      ? Decoration.replace({ widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to) })
-      : QUOTE_MARKER_DECORATION
+  const lang = ctx.state.field(editorLanguageField, false) ?? "ko"
+  const deco = spec.kind === "wikilink"
+    ? Decoration.replace({ widget: new MarkdownWikilinkWidget(spec.target ?? "", spec.alias, spec.from, spec.to, lang) })
+    : QUOTE_MARKER_DECORATION
   pushReplaceDecoration(ctx, deco, spec.from, spec.to)
   return true
 }
@@ -361,7 +357,7 @@ const appendBlockWidgetDecorations = (
     decorations.push(Decoration.replace({ widget: new MarkdownCalloutWidget(c.type, c.title, c.content, c.from, c.to, c.foldState) }).range(c.from, c.to))
   }
   for (const img of groups.images) {
-    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align, img.title, img.from) }).range(img.from, img.to))
+    decorations.push(Decoration.replace({ widget: new MarkdownImageWidget(img.src, img.alt, img.widthPx, img.align, img.title, img.from, editorLanguage) }).range(img.from, img.to))
   }
   for (const m of groups.maths) {
     decorations.push(Decoration.replace({ widget: new MarkdownMathWidget(m.math, m.displayMode) }).range(m.from, m.to))

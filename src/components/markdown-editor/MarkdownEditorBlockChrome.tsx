@@ -406,7 +406,7 @@ export const MarkdownEditorBlockChrome = ({
   }
 
   const applyLineColorSwatch = (token: string) => {
-    const result = computeColorSwatchMutationPlan(value, selection, selectedText, token)
+    const result = computeColorSwatchMutationPlan(value, selection, selectedText, token, language)
     if (result.kind === "replace") {
       onTriggerSlashCommand(result.plan)
       return

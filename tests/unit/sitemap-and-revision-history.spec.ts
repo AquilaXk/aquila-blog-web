@@ -172,6 +172,9 @@ test.describe("Lightweight Sitemap Projection, Revision History Card & Wikilink 
       },
     ])
     expect(formatRevisionTimestampLabel("")).toBe("시각 미상")
+    expect(formatRevisionTimestampLabel("", "en")).toBe("Unknown time")
+    expect(normalizePostRevisionSummaries([{ id: 13, postId: 77, title: "   " }])[0]?.title).toBe("제목 없음")
+    expect(normalizePostRevisionSummaries([{ id: 13, postId: 77, title: "   " }], "en")[0]?.title).toBe("Untitled")
 
     const hiddenHtml = renderNode(createElement(EditorStudioRevisionHistoryCard, { postId: null }))
     expect(hiddenHtml).toBe("")

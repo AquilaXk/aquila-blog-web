@@ -14,6 +14,7 @@ import { EditorStudioDedicatedEditorSurface } from "../../src/routes/Admin/Edito
 import { EditorStudioPublishReadinessCard } from "../../src/routes/Admin/EditorStudioPublishReadinessCard"
 import { EditorStudioThumbnailMetaPanel } from "../../src/routes/Admin/EditorStudioThumbnailPanels"
 import { useEditorStudioKeyboardShortcuts } from "../../src/routes/Admin/useEditorStudioKeyboardShortcuts"
+import { useEditorStudioPersistence } from "../../src/routes/Admin/useEditorStudioPersistence"
 import {
   createMinimalRootContainer,
   createStatefulEditorHarness,
@@ -560,6 +561,139 @@ test.describe("Phase 1 editor workflow & integrity invariants", () => {
           expect(statusCalls).toEqual([])
         } finally {
           globalThis.fetch = originalFetch
+          await act(async () => {
+            root.unmount()
+          })
+        }
+      })
+    }
+  })
+
+  test("handleSaveServerTempDraft respects publish vs non-publish loadingKey on local backup", async () => {
+    for (const [loadingKey, expectMetadataCommit] of [
+      ["uploadThumbnail", true],
+      ["writePost", false],
+      ["modifyPost", false],
+      ["publishTempPost", false],
+    ] as const) {
+      await withClientLanguageStorage(async () => {
+        const container = createMinimalRootContainer()
+        const root = createRoot(container as unknown as Element)
+        const addedTagBatches: string[][] = []
+        const tagDraftUpdates: string[] = []
+        const localSaveOptions: Array<{ silent?: boolean; force?: boolean } | undefined> = []
+        const statusCalls: Array<{ notice: { tone: string; text: string }; target?: string }> = []
+        let saveServerTempDraftFn: ((options?: { silent?: boolean }) => Promise<boolean>) | null = null
+
+        const Probe = () => {
+          const { handleSaveServerTempDraft } = useEditorStudioPersistence({
+            editorMode: "edit",
+            postId: "779",
+            postVersion: 3,
+            postTitle: "임시글 제목",
+            postTags: ["existing"],
+            tagDraft: "pending-tag",
+            postCategory: "",
+            postSummary: "",
+            postSummarySource: "NONE",
+            summaryIntent: { kind: "auto" },
+            postThumbnailUrl: "",
+            postThumbnailFocusX: 50,
+            postThumbnailFocusY: 50,
+            postThumbnailZoom: 1,
+            postVisibility: "PUBLIC_LISTED",
+            effectiveThumbnailUrl: "",
+            loadingKey,
+            getCurrentPostContent: () => "본문",
+            lastWriteFingerprintRef: { current: "" },
+            lastWriteIdempotencyKeyRef: { current: "" },
+            lastLocalDraftFingerprintRef: { current: "" },
+            serverBaselineEditorFingerprintRef: { current: "" },
+            defaultThumbnailFocusX: 50,
+            defaultThumbnailFocusY: 50,
+            defaultThumbnailZoom: 1,
+            addTagsToPost: (tags) => {
+              addedTagBatches.push(tags)
+              return ["existing", ...tags]
+            },
+            setTagDraft: (value) => {
+              tagDraftUpdates.push(typeof value === "function" ? value("pending-tag") : String(value))
+            },
+            setEditorMode: () => undefined,
+            setIsTempDraftMode: () => undefined,
+            setPostId: () => undefined,
+            setPostVersion: () => undefined,
+            setPostSummary: () => undefined,
+            setPostSummarySource: () => undefined,
+            setSummaryIntent: () => undefined,
+            setLocalDraftSavedAt: () => undefined,
+            setPublishStatus: (notice, target) => {
+              statusCalls.push({ notice, target })
+            },
+            setLoadingKey: () => undefined,
+            setResult: () => undefined,
+            setPostThumbnailUrl: () => undefined,
+            setPostThumbnailFocusX: () => undefined,
+            setPostThumbnailFocusY: () => undefined,
+            setPostThumbnailZoom: () => undefined,
+            setPreviewThumbnailSourceUrl: () => undefined,
+            setIsPreviewThumbnailError: () => undefined,
+            setThumbnailImageFileName: () => undefined,
+            composeEditorContent: (c) => c,
+            toFlags: () => ({ published: true, listed: true }),
+            buildEditorStateFingerprint: () => "fp",
+            dedupeStrings: (items) => items,
+            detectPublishPlaceholderIssue: () => "",
+            refreshPublicPostReadViews: async () => undefined,
+            pretty: (v) => JSON.stringify(v),
+            generateIdempotencyKey: () => "idem-1",
+            signalLocalDraftBaselineReady: () => undefined,
+            saveLocalDraft: (options) => {
+              localSaveOptions.push(options)
+            },
+            uploadWithConflictRetry: async () => new Response(null, { status: 204 }),
+            normalizeSafeImageUrl: (url) => url,
+            extractImageFileFromClipboard: () => null,
+          })
+          saveServerTempDraftFn = handleSaveServerTempDraft
+          return null
+        }
+
+        try {
+          await act(async () => {
+            root.render(
+              createElement(ClientLanguageProvider, {
+                initialLanguage: "en",
+                children: createElement(Probe),
+              })
+            )
+          })
+
+          let saved: boolean | undefined
+          await act(async () => {
+            saved = await saveServerTempDraftFn?.({ silent: false })
+          })
+
+          expect(saved).toBe(false)
+          expect(localSaveOptions).toEqual([{ silent: false, force: true }])
+          if (expectMetadataCommit) {
+            expect(addedTagBatches).toEqual([["pending-tag"]])
+            expect(tagDraftUpdates).toEqual([""])
+            expect(statusCalls).toEqual([
+              {
+                notice: {
+                  tone: "success",
+                  text: "Another save is in progress; backed up safely as a browser draft.",
+                },
+                target: "page",
+              },
+            ])
+          } else {
+            expect(addedTagBatches).toEqual([])
+            expect(tagDraftUpdates).toEqual([])
+            expect(statusCalls).toEqual([])
+          }
+        } finally {
           await act(async () => {
             root.unmount()
           })

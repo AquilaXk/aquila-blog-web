@@ -4,7 +4,9 @@ import path from "node:path"
 import { createRoot } from "react-dom/client"
 import { ThemeProvider } from "@emotion/react"
 import { EditorState } from "@codemirror/state"
-import { EditorView } from "@codemirror/view"
+import { EditorView, type DecorationSet } from "@codemirror/view"
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown"
+import { GFM } from "@lezer/markdown"
 import { expect, test } from "@playwright/test"
 import { ApiError, ApiNetworkError, ApiTimeoutError } from "../../src/apis/backend/client"
 import { LanguageProvider } from "../../src/libs/language"
@@ -31,12 +33,16 @@ import { useEditorStudioDraftLifecycle } from "../../src/routes/Admin/useEditorS
 import { useEditorStudioLocalDraftLifecycle } from "../../src/routes/Admin/useEditorStudioDraftLifecycleModel"
 import { useEditorStudioRouting } from "../../src/routes/Admin/useEditorStudioRouting"
 import {
+  blockContainerBlockField,
   MarkdownBookmarkBlockWidget,
   MarkdownCalloutBlockWidget,
   MarkdownEmbedBlockWidget,
   MarkdownFileBlockWidget,
   MarkdownToggleBlockWidget,
 } from "../../src/components/markdown-editor/markdownEditorBlockWidgets"
+import { computeColorSwatchMutationPlan } from "../../src/components/markdown-editor/markdownEditorBlockChromeModel"
+import { parseBlockContainerBlocks } from "../../src/components/markdown-editor/markdownEditorBlockContainerModel"
+import { blockDecorationField, buildInlineViewportDecorations } from "../../src/components/markdown-editor/markdownEditorLiveViewportDecorations"
 import { MarkdownCodeBlockHeaderWidget } from "../../src/components/markdown-editor/markdownEditorCodeBlockChrome"
 import { attachLiveImageControls } from "../../src/components/markdown-editor/markdownEditorImageControls"
 import {
@@ -1478,5 +1484,137 @@ test.describe("Editor Phase 3 remaining sync, KO/EN i18n, and scroll restoration
       "utf8"
     )
     expect(liveSurfaceSource).toMatch(/useImperativeHandle\(\s*ref,\s*\(\)\s*=>\s*\(\{[\s\S]*?\}\),\s*\[\]\s*\)/)
+  })
+
+  test("parseBlockContainerBlocks, color swatch fallback, and live CM6 KO->EN widget transitions localize defaults cleanly", async () => {
+    const containerDoc = [
+      ":::callout",
+      "Body",
+      ":::",
+      "",
+      ":::callout note+",
+      "Note body",
+      ":::",
+      "",
+      ":::summary",
+      "Summary body",
+      ":::",
+      "",
+      ":::toggle",
+      "Toggle body",
+      ":::",
+    ].join("\n")
+
+    const koBlocks = parseBlockContainerBlocks(containerDoc)
+    expect(koBlocks.map((b) => ("title" in b ? b.title : ""))).toEqual(["콜아웃", "배경 메모", "핵심 요약", "토글 블록"])
+
+    const enBlocks = parseBlockContainerBlocks(containerDoc, "en")
+    expect(enBlocks.map((b) => ("title" in b ? b.title : ""))).toEqual(["Callout", "Note", "Summary", "Toggle block"])
+
+    expect(computeColorSwatchMutationPlan("", { from: 0, to: 0 }, "", "sky")).toEqual({
+      kind: "replace",
+      plan: {
+        rangeStart: 0,
+        rangeEnd: 0,
+        replacement: "{{color:sky|강조 텍스트}}",
+        selectionStart: "{{color:sky|강조 텍스트}}".length,
+        selectionEnd: "{{color:sky|강조 텍스트}}".length,
+      },
+    })
+    expect(computeColorSwatchMutationPlan("", { from: 0, to: 0 }, "", "sky", "en")).toEqual({
+      kind: "replace",
+      plan: {
+        rangeStart: 0,
+        rangeEnd: 0,
+        replacement: "{{color:sky|Highlighted text}}",
+        selectionStart: "{{color:sky|Highlighted text}}".length,
+        selectionEnd: "{{color:sky|Highlighted text}}".length,
+      },
+    })
+
+    await withFakeDomEnvironment(async () => {
+      const mixedDoc = [
+        "Intro",
+        "",
+        "- [x] Task item",
+        "[[WikiTarget|WikiAlias]]",
+        "",
+        "![alt](https://example.com/a.png)",
+        "",
+        ":::callout",
+        "Body",
+        ":::",
+        "",
+        ":::toggle",
+        "Toggle body",
+        ":::",
+      ].join("\n")
+
+      const makeView = (state: EditorState) => {
+        const wrappedState = Object.create(state) as EditorState
+        ;(wrappedState as { facet: EditorState["facet"] }).facet = (() => true) as unknown as EditorState["facet"]
+        return {
+          state: wrappedState,
+          dispatch: () => undefined,
+          posAtDOM: () => 0,
+          focus: () => undefined,
+        } as unknown as EditorView
+      }
+
+      const collectWidgets = (set: DecorationSet) => {
+        const widgets: Array<{ eq: (other: unknown) => boolean; toDOM: (view?: EditorView) => any }> = []
+        set.between(0, mixedDoc.length, (_from, _to, value) => {
+          const widget = (value as { spec?: { widget?: unknown } })?.spec?.widget as
+            | { eq: (other: unknown) => boolean; toDOM: (view?: EditorView) => any }
+            | undefined
+          if (widget) widgets.push(widget)
+        })
+        return widgets
+      }
+
+      const koState = EditorState.create({
+        doc: mixedDoc,
+        selection: { anchor: 0 },
+        extensions: [
+          markdown({ base: markdownLanguage, extensions: GFM }),
+          editorLanguageField.init(() => "ko"),
+          blockContainerBlockField,
+          blockDecorationField,
+        ],
+      })
+      const koView = makeView(koState)
+      const koInlineWidgets = collectWidgets(buildInlineViewportDecorations(koState, [{ from: 0, to: mixedDoc.length }]))
+      const koBlockWidgets = collectWidgets(koState.field(blockDecorationField))
+      const koContainerWidgets = collectWidgets(koState.field(blockContainerBlockField))
+
+      expect(koInlineWidgets[0]?.toDOM(koView).getAttribute("aria-label")).toBe("할 일 체크 전환")
+      expect(koInlineWidgets[1]?.toDOM(koView).getAttribute("aria-label")).toBe("위키링크: WikiAlias")
+      const koImgDom = koBlockWidgets[0]?.toDOM(koView)
+      expect(koImgDom?.querySelector(".cm-live-image-caption-input")?.placeholder).toBe("캡션 / 대체 텍스트")
+      expect(koImgDom?.querySelector(".cm-live-image-resize-handle")?.getAttribute("aria-label")).toBe("이미지 너비 조절")
+      expect(koContainerWidgets[0]?.toDOM(koView).querySelector(".cm-live-callout-title")?.textContent).toBe("콜아웃")
+      expect(koContainerWidgets[1]?.toDOM(koView).querySelector(".cm-live-toggle-title")?.textContent).toBe("토글 블록")
+
+      // Switch language via live CM6 transaction without document edit
+      const enState = koState.update({ effects: setEditorLanguage.of("en") }).state
+      const enView = makeView(enState)
+      const enInlineWidgets = collectWidgets(buildInlineViewportDecorations(enState, [{ from: 0, to: mixedDoc.length }]))
+      const enBlockWidgets = collectWidgets(enState.field(blockDecorationField))
+      const enContainerWidgets = collectWidgets(enState.field(blockContainerBlockField))
+
+      expect(koInlineWidgets[0]?.eq(enInlineWidgets[0])).toBe(false)
+      expect(koInlineWidgets[1]?.eq(enInlineWidgets[1])).toBe(false)
+      expect(koBlockWidgets[0]?.eq(enBlockWidgets[0])).toBe(false)
+      expect(koContainerWidgets[0]?.eq(enContainerWidgets[0])).toBe(false)
+      expect(koContainerWidgets[1]?.eq(enContainerWidgets[1])).toBe(false)
+
+      expect(enInlineWidgets[0]?.toDOM(enView).getAttribute("aria-label")).toBe("Toggle task item")
+      expect(enInlineWidgets[1]?.toDOM(enView).getAttribute("aria-label")).toBe("Wikilink: WikiAlias")
+      const enImgDom = enBlockWidgets[0]?.toDOM(enView)
+      expect(enImgDom?.querySelector(".cm-live-image-caption-input")?.placeholder).toBe("Caption / alt")
+      expect(enImgDom?.querySelector(".cm-live-image-resize-handle")?.getAttribute("aria-label")).toBe("Resize image width")
+      expect(enContainerWidgets[0]?.toDOM(enView).querySelector(".cm-live-callout-title")?.textContent).toBe("Callout")
+      expect(enContainerWidgets[1]?.toDOM(enView).querySelector(".cm-live-toggle-title")?.textContent).toBe("Toggle block")
+    })
   })
 })

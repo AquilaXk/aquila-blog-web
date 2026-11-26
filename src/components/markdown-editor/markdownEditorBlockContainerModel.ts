@@ -1,4 +1,5 @@
 // 참조 구현: silverbulletmd/silverbullet (MIT) — 콜아웃·접힘 토큰 및 embed/bookmark 컨테이너 모델
+import type { SiteLanguage } from "../../libs/language"
 import { translations, type TranslationKey } from "../../libs/language/translations"
 import {
   resolveCalloutBlockquote,
@@ -193,7 +194,8 @@ const resolveCalloutToneFromEmoji = (normalizedIcon: string, rawEmoji: string): 
 const parseCalloutContainerPayload = (
   rawHeader: string,
   bodyLines: readonly string[],
-  quotedTitle: string | null
+  quotedTitle: string | null,
+  language: SiteLanguage = "ko"
 ): {
   tone: EditorCalloutTone
   icon: string
@@ -297,10 +299,12 @@ const parseCalloutContainerPayload = (
 
   const resolvedDefaultTitle =
     calloutKind === "summary"
-      ? translations.ko[DEFAULT_CALLOUT_TITLE_KEYS.summary]
+      ? translations[language][DEFAULT_CALLOUT_TITLE_KEYS.summary]
       : foldable && calloutKind
-        ? translations.ko[DEFAULT_CALLOUT_TITLE_KEYS[calloutKind]]
-        : "콜아웃"
+        ? translations[language][DEFAULT_CALLOUT_TITLE_KEYS[calloutKind]]
+        : language === "en"
+          ? "Callout"
+          : "콜아웃"
 
   return {
     tone,
@@ -375,10 +379,11 @@ type OpenAsideCandidate = {
 
 const buildAsideCalloutBlock = (
   aside: OpenAsideCandidate,
-  lineEnd: number
+  lineEnd: number,
+  language: SiteLanguage = "ko"
 ): EditorCalloutContainerBlock => {
   const trimmedBodyLines = aside.bodyLines.map((row) => row.trim())
-  const parsed = parseCalloutContainerPayload("", trimmedBodyLines, null)
+  const parsed = parseCalloutContainerPayload("", trimmedBodyLines, null, language)
   return {
     kind: "callout",
     from: aside.from,
@@ -394,13 +399,15 @@ const buildAsideCalloutBlock = (
 
 const finalizeBlockCandidate = (
   candidate: OpenContainerCandidate,
-  lineEnd: number
+  lineEnd: number,
+  language: SiteLanguage = "ko"
 ): EditorContainerBlock | null => {
   if (candidate.kind === "callout") {
     const parsed = parseCalloutContainerPayload(
       candidate.rawHeader,
       candidate.bodyLines,
-      candidate.quotedTitle
+      candidate.quotedTitle,
+      language
     )
     return {
       kind: "callout",
@@ -421,7 +428,7 @@ const finalizeBlockCandidate = (
       kind: "toggle",
       from: candidate.from,
       to: lineEnd,
-      title: candidate.rawTitle.trim() || "토글 블록",
+      title: candidate.rawTitle.trim() || (language === "en" ? "Toggle block" : "토글 블록"),
       body: candidate.bodyLines.join("\n").trim(),
       bodyOffset: candidate.bodyOffset,
     }
@@ -429,7 +436,10 @@ const finalizeBlockCandidate = (
   return finalizeCustomContainerBlock(candidate, lineEnd)
 }
 
-export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock[] => {
+export const parseBlockContainerBlocks = (
+  docText: string,
+  language: SiteLanguage = "ko"
+): EditorContainerBlock[] => {
   if (!docText.includes(":::") && !docText.includes("<aside")) return []
 
   const { codeBlockRanges, commentRanges } = parseCommonMarkBlockRanges(docText)
@@ -485,7 +495,7 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
         const closedTail = stripClosingAsideTag(lineText)
         if (closedTail !== null) {
           if (closedTail.length > 0) asideCandidate.bodyLines.push(closedTail)
-          blocks.push(buildAsideCalloutBlock(asideCandidate, lineEnd))
+          blocks.push(buildAsideCalloutBlock(asideCandidate, lineEnd, language))
           asideCandidate = null
           continue
         }
@@ -506,7 +516,7 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
             stack.pop()
           }
           if (stack.length === 0) {
-            const finalized = finalizeBlockCandidate(candidate, lineEnd)
+            const finalized = finalizeBlockCandidate(candidate, lineEnd, language)
             if (finalized) blocks.push(finalized)
             candidate = null
             continue
@@ -542,7 +552,7 @@ export const parseBlockContainerBlocks = (docText: string): EditorContainerBlock
               : [],
         }
         if (inlineClosed !== null) {
-          blocks.push(buildAsideCalloutBlock(nextAside, lineEnd))
+          blocks.push(buildAsideCalloutBlock(nextAside, lineEnd, language))
         } else {
           asideCandidate = nextAside
         }

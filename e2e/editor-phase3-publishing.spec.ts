@@ -593,6 +593,17 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
         "| --- | --- |",
         "| A | B |",
         "",
+        ":::callout",
+        "En callout body",
+        ":::",
+        "",
+        ":::summary",
+        "En summary body",
+        ":::",
+        "",
+        "- [x] En task",
+        "[[WikiTarget|WikiAlias]]",
+        "",
         ":::toggle",
         ":::",
       ].join("\n"),
@@ -605,5 +616,10 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
     await expect(page.getByRole("button", { name: "Copy code" })).toBeVisible()
     await expect(page.getByRole("toolbar", { name: "Table quick edit toolbar" })).toBeVisible()
     await expect(page.getByRole("button", { name: "Toggle expand/collapse" })).toBeVisible()
+    await expect(page.locator(".cm-live-callout-title").filter({ hasText: "Callout" })).toBeVisible()
+    await expect(page.locator(".cm-live-callout-title").filter({ hasText: "Summary" })).toBeVisible()
+    await expect(page.locator(".cm-live-toggle-title").filter({ hasText: "Toggle block" })).toBeVisible()
+    await expect(page.getByRole("checkbox", { name: "Toggle task item" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Wikilink: WikiAlias" })).toBeVisible()
   })
 })

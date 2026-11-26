@@ -12,7 +12,7 @@ import {
   serializeStandaloneMarkdownImageLine,
   type ParsedStandaloneMarkdownImage,
 } from "../../libs/markdown/renderingImageModel"
-import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
+import { resolveEditorViewLanguage, type SiteLanguage } from "./markdownEditorLanguageState"
 import { planReplaceSelection, type PlannedTextMutation } from "./markdownEditorTextMutation"
 import { getImageControlLabels } from "./markdownEditorWidgetLabels"
 
@@ -170,6 +170,7 @@ export const attachLiveImageControls = ({
   align,
   title,
   fallbackFrom = 0,
+  uiLanguage = "ko",
 }: {
   view?: EditorView
   wrap: HTMLElement
@@ -180,6 +181,7 @@ export const attachLiveImageControls = ({
   align?: string
   title?: string
   fallbackFrom?: number
+  uiLanguage?: SiteLanguage
 }) => {
   const editable = Boolean(view?.state.facet(EditorView.editable))
   const frame = document.createElement("span")
@@ -188,7 +190,7 @@ export const attachLiveImageControls = ({
   wrap.appendChild(frame)
 
   if (!editable || !view) return
-  const labels = getImageControlLabels(resolveEditorViewLanguage(view, "ko"))
+  const labels = getImageControlLabels(resolveEditorViewLanguage(view, uiLanguage))
 
   const resizeHandle = document.createElement("button")
   resizeHandle.type = "button"

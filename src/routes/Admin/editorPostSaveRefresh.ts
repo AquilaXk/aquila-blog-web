@@ -1,3 +1,4 @@
+import type { SiteLanguage } from "src/libs/language"
 import { toCanonicalPostPath } from "src/libs/utils/postPath"
 
 type RefreshNotice = { tone: "success" | "error"; text: string }
@@ -19,7 +20,8 @@ export const revalidateSavedPost = async (postId: string | number): Promise<void
 // 서버 저장이 확정된 뒤의 조회 갱신 실패를 저장 실패로 되돌리지 않는다.
 export const resolvePostSaveRefresh = async (
   refresh: () => Promise<void>,
-  successText: string
+  successText: string,
+  language: SiteLanguage = "ko"
 ): Promise<RefreshNotice> => {
   try {
     await refresh()
@@ -27,7 +29,10 @@ export const resolvePostSaveRefresh = async (
   } catch {
     return {
       tone: "error",
-      text: "저장은 완료됐지만 공개 화면 갱신에 실패했습니다. 다시 저장할 필요는 없습니다.",
+      text:
+        language === "en"
+          ? "Saved, but failed to refresh the public view. No need to save again."
+          : "저장은 완료됐지만 공개 화면 갱신에 실패했습니다. 다시 저장할 필요는 없습니다.",
     }
   }
 }

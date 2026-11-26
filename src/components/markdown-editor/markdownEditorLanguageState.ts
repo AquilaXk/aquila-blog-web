@@ -1,6 +1,7 @@
 import { EditorState, StateEffect, StateField } from "@codemirror/state"
 import type { EditorView } from "@codemirror/view"
 import type { SiteLanguage } from "src/libs/language"
+export type { SiteLanguage }
 
 export const setEditorLanguage = StateEffect.define<SiteLanguage>()
 

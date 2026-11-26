@@ -152,6 +152,8 @@ export const MarkdownEditorReadingPreview = ({
         }
       })
       observer.observe(canvas, { childList: true, subtree: true })
+    } else {
+      scheduleRestore()
     }
 
     return () => {

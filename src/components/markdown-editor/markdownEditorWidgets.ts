@@ -16,7 +16,7 @@ import { resolveCalloutBlockquote, type CalloutKind } from "../../libs/markdown/
 import { getLiveCalloutIconSvg, LIVE_BLOCK_UI_SVGS } from "./markdownEditorBlockSvgIcons"
 import { attachLiveImageControls } from "./markdownEditorImageControls"
 import { appendInlineMarkdownNodes, renderKatexIntoElement } from "./markdownEditorInlineDom"
-import { resolveEditorViewLanguage } from "./markdownEditorLanguageState"
+import { resolveEditorViewLanguage, type SiteLanguage } from "./markdownEditorLanguageState"
 
 export type MermaidColorScheme = "dark" | "light"
 
@@ -49,13 +49,9 @@ export class MarkdownRuleWidget extends WidgetType {
 }
 
 export class MarkdownTaskWidget extends WidgetType {
-  constructor(private readonly checked: boolean, private readonly from: number, private readonly to: number) {
-    super()
-  }
+  constructor(private readonly checked: boolean, private readonly from: number, private readonly to: number, private readonly uiLanguage: SiteLanguage = "ko") { super() }
 
-  eq(other: MarkdownTaskWidget) {
-    return other instanceof MarkdownTaskWidget && other.checked === this.checked
-  }
+  eq(other: MarkdownTaskWidget) { return other instanceof MarkdownTaskWidget && other.checked === this.checked && other.uiLanguage === this.uiLanguage }
 
   toDOM(view: EditorView) {
     const checkbox = document.createElement("span")
@@ -64,7 +60,7 @@ export class MarkdownTaskWidget extends WidgetType {
     checkbox.setAttribute("tabindex", "0")
     checkbox.setAttribute("role", "checkbox")
     checkbox.setAttribute("aria-checked", this.checked ? "true" : "false")
-    checkbox.setAttribute("aria-label", "Toggle task item")
+    checkbox.setAttribute("aria-label", resolveEditorViewLanguage(view, this.uiLanguage) === "en" ? "Toggle task item" : "할 일 체크 전환")
     if (checkbox.dataset) {
       checkbox.dataset.from = String(this.from)
       checkbox.dataset.to = String(this.to)
@@ -129,24 +125,12 @@ export class MarkdownMathWidget extends WidgetType {
 
 export class MarkdownImageWidget extends WidgetType {
   constructor(
-    private readonly src: string,
-    private readonly alt: string,
-    private readonly widthPx?: number,
-    private readonly align?: string,
-    private readonly title?: string,
-    private readonly from = 0
-  ) {
-    super()
-  }
+    private readonly src: string, private readonly alt: string, private readonly widthPx?: number,
+    private readonly align?: string, private readonly title?: string, private readonly from = 0, private readonly uiLanguage: SiteLanguage = "ko"
+  ) { super() }
 
   eq(other: MarkdownImageWidget) {
-    return (
-      other.src === this.src &&
-      other.alt === this.alt &&
-      other.widthPx === this.widthPx &&
-      other.align === this.align &&
-      other.title === this.title
-    )
+    return other.src === this.src && other.alt === this.alt && other.widthPx === this.widthPx && other.align === this.align && other.title === this.title && other.uiLanguage === this.uiLanguage
   }
 
   toDOM(view?: EditorView) {
@@ -164,7 +148,7 @@ export class MarkdownImageWidget extends WidgetType {
     img.loading = "lazy"
     attachLiveImageControls({
       view, wrap, img, src: this.src, alt: this.alt, widthPx: this.widthPx,
-      align: this.align, title: this.title, fallbackFrom: this.from,
+      align: this.align, title: this.title, fallbackFrom: this.from, uiLanguage: resolveEditorViewLanguage(view, this.uiLanguage),
     })
     return wrap
   }
@@ -401,17 +385,10 @@ export class MarkdownCalloutWidget extends WidgetType {
 export { MarkdownTableWidget } from "./markdownEditorTableWidget"
 
 export class MarkdownWikilinkWidget extends WidgetType {
-  constructor(
-    private readonly target: string,
-    private readonly alias?: string,
-    private readonly from?: number,
-    private readonly to?: number
-  ) {
-    super()
-  }
+  constructor(private readonly target: string, private readonly alias?: string, private readonly from?: number, private readonly to?: number, private readonly uiLanguage: SiteLanguage = "ko") { super() }
 
   eq(other: MarkdownWikilinkWidget) {
-    return other instanceof MarkdownWikilinkWidget && other.target === this.target && other.alias === this.alias
+    return other instanceof MarkdownWikilinkWidget && other.target === this.target && other.alias === this.alias && other.uiLanguage === this.uiLanguage
   }
 
   toDOM(view: EditorView) {
@@ -419,7 +396,8 @@ export class MarkdownWikilinkWidget extends WidgetType {
     root.className = "cm-live-wikilink"
     root.setAttribute("role", "link")
     root.setAttribute("tabindex", "0")
-    root.setAttribute("aria-label", `Wikilink: ${this.alias || this.target}`)
+    const linkPrefix = resolveEditorViewLanguage(view, this.uiLanguage) === "en" ? "Wikilink" : "위키링크"
+    root.setAttribute("aria-label", `${linkPrefix}: ${this.alias || this.target}`)
     root.dataset.target = this.target
     if (this.alias) root.dataset.alias = this.alias
     if (this.from !== undefined) root.dataset.from = String(this.from)

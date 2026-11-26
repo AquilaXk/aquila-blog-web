@@ -242,13 +242,24 @@ export class MarkdownToggleBlockWidget extends WidgetType {
   }
 }
 
-const containerBlocksCacheByDoc = new WeakMap<EditorState["doc"], readonly EditorContainerBlock[]>()
+const containerBlocksCacheByDoc = new WeakMap<
+  EditorState["doc"],
+  Partial<Record<SiteLanguage, readonly EditorContainerBlock[]>>
+>()
 
-export const getCachedBlockContainerBlocks = (doc: EditorState["doc"]): readonly EditorContainerBlock[] => {
-  const cached = containerBlocksCacheByDoc.get(doc)
+export const getCachedBlockContainerBlocks = (
+  doc: EditorState["doc"],
+  language: SiteLanguage = "ko"
+): readonly EditorContainerBlock[] => {
+  let byLanguage = containerBlocksCacheByDoc.get(doc)
+  const cached = byLanguage?.[language]
   if (cached) return cached
-  const blocks = parseBlockContainerBlocks(getDocString(doc))
-  containerBlocksCacheByDoc.set(doc, blocks)
+  const blocks = parseBlockContainerBlocks(getDocString(doc), language)
+  if (!byLanguage) {
+    byLanguage = {}
+    containerBlocksCacheByDoc.set(doc, byLanguage)
+  }
+  byLanguage[language] = blocks
   return blocks
 }
 
@@ -341,7 +352,7 @@ const buildBlockContainerDecorations = (state: EditorState): DecorationSet => {
   if (mode === "source" || state.doc.length === 0) return Decoration.none
 
   const language = state.field(editorLanguageField, false) ?? "ko"
-  const blocks = getCachedBlockContainerBlocks(state.doc)
+  const blocks = getCachedBlockContainerBlocks(state.doc, language)
   if (blocks.length === 0) return Decoration.none
 
   const isFocused = state.field(editorFocusField, false) ?? true
@@ -381,7 +392,8 @@ export const blockContainerBlockField = StateField.define<DecorationSet>({
     )
     if (!transaction.docChanged && !hasModeOrFocusEffect) {
       if (!transaction.selection) return decorations
-      const blocks = getCachedBlockContainerBlocks(transaction.state.doc)
+      const language = transaction.state.field(editorLanguageField, false) ?? "ko"
+      const blocks = getCachedBlockContainerBlocks(transaction.state.doc, language)
       if (haveSameActiveContainerBlocks(blocks, transaction.startState.selection.ranges, transaction.state.selection.ranges)) {
         return decorations
       }
