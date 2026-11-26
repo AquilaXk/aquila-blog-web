@@ -5,7 +5,7 @@ import { evictBrowserRevalidateCacheEntries } from "../client"
 import { resetPostsRequestCaches } from "./PostApiRequests"
 
 const PUBLIC_POST_READ_CACHE_PATH_REGEX =
-  /(?:^|\/)post\/api\/v1\/posts\/(?:bootstrap|feed|explore|search|tags|sitemap|related\/author|[0-9]+)(?:$|[/?])/i
+  /(?:^|\/)post\/api\/v1\/posts\/(?:bootstrap|feed|explore|search|tags|sitemap|related\/author|wikilink-catalog|[0-9]+)(?:$|[/?])/i
 
 export const invalidatePublicPostReadCaches = async (
   queryClient?: QueryClient,

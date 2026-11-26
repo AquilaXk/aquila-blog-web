@@ -7,12 +7,14 @@ import {
   evictBrowserRevalidateCacheEntries,
   fetchRawApiMutation,
 } from "../../src/apis/backend/client"
+import { invalidatePublicPostReadCaches } from "../../src/apis/backend/posts/PostApiCache"
 import { resolveEditorUploadFailureRecovery } from "../../src/routes/Admin/editorFailureRecoveryModel"
 
 const originalFetch = globalThis.fetch
 const originalWindow = (globalThis as Record<string, unknown>).window
 
 test.afterEach(() => {
+  evictBrowserRevalidateCacheEntries(() => true)
   globalThis.fetch = originalFetch
   if (originalWindow === undefined) {
     delete (globalThis as Record<string, unknown>).window
@@ -229,4 +231,28 @@ test("public GET request policies omit credentials and enable ETag revalidate fo
   expect(calls.some((entry) => entry.url.endsWith("/wikilink-catalog") && entry.ifNoneMatch === 'W/"cat-1"')).toBe(true)
   expect(calls.some((entry) => entry.url.endsWith("/42/backlinks"))).toBe(true)
   expect(calls.some((entry) => entry.url.endsWith("/posts/42"))).toBe(true)
+
+  await invalidatePublicPostReadCaches()
+
+  const postEvictIfNoneMatch: Array<{ url: string; ifNoneMatch: string | null }> = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    const headers = new Headers(init?.headers)
+    postEvictIfNoneMatch.push({ url, ifNoneMatch: headers.get("if-none-match") })
+    if (url.endsWith("/post/api/v1/posts/wikilink-catalog")) {
+      return new Response(
+        JSON.stringify({ items: [{ id: 36, title: "Updated Target", createdAt: "2026-11-26T00:00:00Z" }] }),
+        { status: 200, headers: { "content-type": "application/json", etag: 'W/"cat-2"' } }
+      )
+    }
+    return new Response(JSON.stringify({ items: [{ id: 99, title: "New Backlink", summary: "s" }] }), {
+      status: 200,
+      headers: { "content-type": "application/json", etag: 'W/"bl-42-2"' },
+    })
+  }) as typeof fetch
+
+  const freshCatalog = await apiFetch<{ items: Array<{ id: number; title: string }> }>("/post/api/v1/posts/wikilink-catalog")
+  await apiFetch<{ items: Array<{ id: number; title: string }> }>("/post/api/v1/posts/42/backlinks")
+  expect(freshCatalog.items[0]?.title).toBe("Updated Target")
+  expect(postEvictIfNoneMatch.every((entry) => entry.ifNoneMatch === null)).toBe(true)
 })
