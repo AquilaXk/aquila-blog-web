@@ -1,4 +1,5 @@
-import { createElement, type ReactElement } from "react"
+import { act, createElement, type ReactElement } from "react"
+import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { ThemeProvider } from "@emotion/react"
 import { expect, test } from "@playwright/test"
@@ -30,9 +31,16 @@ import {
   POST_CONTENT_MAX_LENGTH,
 } from "../../src/routes/Admin/editorStudioMetaModel"
 import { scanMarkdownPrePublishWarnings } from "../../src/routes/Admin/editorStudioPublishWarnings"
+import { EditorStudioInspectorPublishingFields } from "../../src/routes/Admin/EditorStudioInspectorPublishingFields"
+import { EditorStudioPublishMetadataSection } from "../../src/routes/Admin/EditorStudioPublishMetadataSection"
 import { EditorStudioPublishReadinessCard } from "../../src/routes/Admin/EditorStudioPublishReadinessCard"
 import { EditorStudioThumbnailEditorPanel } from "../../src/routes/Admin/EditorStudioThumbnailPanels"
 import { toVisibility } from "../../src/routes/Admin/editorStudioState"
+import {
+  getLocalDraftDocumentId,
+  localDraftStorageKeyForDocument,
+} from "../../src/routes/Admin/editorStudioStorageModel"
+import { useEditorStudioKeyboardShortcuts } from "../../src/routes/Admin/useEditorStudioKeyboardShortcuts"
 import {
   executeServerTempDraftSave,
   validateEditorContentPreflight,
@@ -44,10 +52,95 @@ import {
 } from "../../src/routes/Admin/useEditorStudioPublishingMetadata"
 import { buildPostDetailMetadata, normalizeExternalCanonicalUrl } from "../../src/routes/Detail/PostDetail/postDetailMetadataModel"
 import { PostDetailSeriesCard } from "../../src/routes/Detail/PostDetail/PostDetailSeriesCard"
-import { materializePlaywrightJsx } from "./helpers/materializePlaywrightJsx"
+import { createMinimalRootContainer, withWindowStorage } from "./helpers/editorStudioTestHarness"
+import { materializePlaywrightJsx, wrapPlaywrightJsxComponent } from "./helpers/materializePlaywrightJsx"
 import type { TPost } from "../../src/types"
 
+const ClientLanguageProvider = wrapPlaywrightJsxComponent(LanguageProvider) as typeof LanguageProvider
+const ClientThemeProvider = wrapPlaywrightJsxComponent(ThemeProvider) as typeof ThemeProvider
+const ClientPublishMetadataSection = wrapPlaywrightJsxComponent(
+  EditorStudioPublishMetadataSection
+) as typeof EditorStudioPublishMetadataSection
+const ClientInspectorPublishingFields = wrapPlaywrightJsxComponent(
+  EditorStudioInspectorPublishingFields
+) as typeof EditorStudioInspectorPublishingFields
+
 const lightTheme = createTheme({ scheme: "light" })
+
+const withClientDom = async (run: (ctx: { storage: Storage; rootContainer: Element }) => Promise<void>) =>
+  withWindowStorage(async (storage) => {
+    const createEl = (tag: string): Record<string, any> => {
+      const attrs = new Map<string, string>()
+      const childNodes: any[] = []
+      const el: Record<string, any> = {
+        nodeType: 1,
+        tagName: tag.toUpperCase(),
+        nodeName: tag.toUpperCase(),
+        namespaceURI: "http://www.w3.org/1999/xhtml",
+        parentElement: null,
+        parentNode: null,
+        childNodes,
+        children: childNodes,
+        get firstChild() {
+          return childNodes[0] ?? null
+        },
+        style: { setProperty: () => undefined, removeProperty: () => undefined },
+        textContent: "",
+        value: "",
+        setAttribute: (k: string, v: string) => attrs.set(k, String(v)),
+        getAttribute: (k: string) => attrs.get(k) ?? null,
+        hasAttribute: (k: string) => attrs.has(k),
+        removeAttribute: (k: string) => attrs.delete(k),
+        appendChild: (c: Record<string, any>) => {
+          c.parentNode = el
+          c.parentElement = el
+          childNodes.push(c)
+          return c
+        },
+        insertBefore: (n: Record<string, any>) => {
+          n.parentNode = el
+          n.parentElement = el
+          childNodes.push(n)
+          return n
+        },
+        removeChild: (c: Record<string, any>) => {
+          const i = childNodes.indexOf(c)
+          if (i >= 0) childNodes.splice(i, 1)
+          return c
+        },
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        querySelectorAll: () => [],
+      }
+      return el
+    }
+    const head = createEl("head")
+    const body = createEl("body")
+    const doc: Record<string, any> = {
+      nodeType: 9,
+      head,
+      body,
+      documentElement: { lang: "" },
+      activeElement: null,
+      createElement: (tag: string) => Object.assign(createEl(tag), { ownerDocument: doc }),
+      createTextNode: (data: string) => ({ nodeType: 3, nodeValue: String(data), textContent: String(data), ownerDocument: doc }),
+      querySelectorAll: () => [],
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }
+    head.ownerDocument = doc
+    body.ownerDocument = doc
+    const prevDoc = Object.getOwnPropertyDescriptor(globalThis, "document")
+    Object.defineProperty(globalThis, "document", { configurable: true, writable: true, value: doc })
+    ;(globalThis.window as unknown as Record<string, unknown>).document = doc
+    try {
+      const rootContainer = Object.assign(createMinimalRootContainer(), { ownerDocument: doc }) as unknown as Element
+      await run({ storage, rootContainer })
+    } finally {
+      if (prevDoc) Object.defineProperty(globalThis, "document", prevDoc)
+      else delete (globalThis as Record<string, unknown>).document
+    }
+  })
 
 const renderThemed = (node: unknown, initialLanguage: "ko" | "en" = "ko"): string =>
   renderToStaticMarkup(
@@ -337,7 +430,7 @@ test.describe("Editor Phase 3 features & edge cases", () => {
     expect(thumbHtml).not.toContain("썸네일 위치 조정")
   })
 
-  test("executeServerTempDraftSave sanitizes partial invalid canonicalUrl during autosave", async () => {
+  test("executeServerTempDraftSave and Mod+S fail closed on invalid canonicalUrl to preserve server value and local draft", async () => {
     const capturedBodies: Array<Record<string, unknown>> = []
     const originalFetch = globalThis.fetch
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -354,56 +447,280 @@ test.describe("Editor Phase 3 features & edge cases", () => {
       )
     }) as typeof fetch
 
-    try {
-      const ok = await executeServerTempDraftSave({
-        silent: true,
-        isEn: false,
-        normalizedPostId: "99",
-        postTitle: "Draft",
-        currentPostContent: "Draft body",
-        composed: "Draft body",
-        postVersion: 1,
-        effectiveTags: [],
-        effectiveCategory: "",
-        effectiveThumbnailUrl: "",
-        postSummary: "",
-        postSummarySource: "NONE",
-        postScheduledAt: "",
+    await withClientDom(async ({ storage, rootContainer }) => {
+      try {
+        const draftStorageKey = localDraftStorageKeyForDocument(
+          { kind: "post", postId: "99" },
+          getLocalDraftDocumentId()
+        )
+        storage.setItem(
+          draftStorageKey,
+          JSON.stringify({ title: "Draft", content: "Draft body", canonicalUrl: "https://", savedAt: "t1" })
+        )
+        const serverBaselineRef = { current: "baseline-fp" }
+        const localSavedAtUpdates: string[] = []
+        const localSaveCalls: Array<{ silent?: boolean; force?: boolean } | undefined> = []
+        const statusCalls: Array<{ notice: { tone: string; text: string }; target?: string }> = []
+
+        const commonInput = {
+          isEn: false,
+          normalizedPostId: "99",
+          postTitle: "Draft",
+          currentPostContent: "Draft body",
+          composed: "Draft body",
+          postVersion: 1,
+          effectiveTags: [],
+          effectiveCategory: "",
+          effectiveThumbnailUrl: "",
+          postSummary: "",
+          postSummarySource: "NONE",
+          postScheduledAt: "",
+          postSeriesName: "",
+          postSeriesOrder: null,
+          getCurrentPostContent: () => "Draft body",
+          applyCanonicalWriteResponse: () => ({ summary: "Auto summary", summarySource: "EXTRACTED" as const, intent: { kind: "auto" as const } }),
+          buildSuccessfulWriteFingerprintPayload: () => ({
+            title: "Draft",
+            content: "Draft body",
+            tags: [],
+            category: "",
+            thumbnailUrl: "",
+            thumbnailFocusX: 50,
+            thumbnailFocusY: 50,
+            thumbnailZoom: 1,
+            summary: "Auto summary",
+            summarySource: "EXTRACTED" as const,
+            summaryIntent: { kind: "auto" as const },
+            visibility: "PUBLIC_LISTED" as const,
+          }),
+          buildEditorStateFingerprint: () => "fp-1",
+          dedupeStrings: (items: string[]) => items,
+          serverBaselineEditorFingerprintRef: serverBaselineRef,
+          lastLocalDraftFingerprintRef: { current: "" },
+          signalLocalDraftBaselineReady: () => {},
+          saveLocalDraft: (options?: { silent?: boolean; force?: boolean }) => {
+            localSaveCalls.push(options)
+          },
+          setPostVersion: () => {},
+          setLocalDraftSavedAt: (val: string | ((prev: string) => string)) => {
+            localSavedAtUpdates.push(typeof val === "function" ? val("") : val)
+          },
+          setLoadingKey: () => {},
+          setLastSaveError: () => {},
+          setPublishStatus: (notice: { tone: string; text: string }, target?: string) => {
+            statusCalls.push({ notice, target })
+          },
+        }
+
+        // 1. Autosave (silent: true) skips PUT completely and preserves baseline + local draft
+        const silentOk = await executeServerTempDraftSave({
+          ...commonInput,
+          silent: true,
+          postCanonicalUrl: "https://",
+        })
+        expect(silentOk).toBe(false)
+        expect(capturedBodies).toHaveLength(0)
+        expect(serverBaselineRef.current).toBe("baseline-fp")
+        expect(storage.getItem(draftStorageKey)).not.toBeNull()
+        expect(localSavedAtUpdates).toEqual([])
+        expect(localSaveCalls).toEqual([])
+
+        // 2. Manual Mod+S (silent: false) saves locally, shows error guidance, and never overwrites server or deletes local draft
+        const manualOk = await executeServerTempDraftSave({
+          ...commonInput,
+          silent: false,
+          postCanonicalUrl: "javascript:alert(1)",
+        })
+        expect(manualOk).toBe(false)
+        expect(capturedBodies).toHaveLength(0)
+        expect(serverBaselineRef.current).toBe("baseline-fp")
+        expect(storage.getItem(draftStorageKey)).not.toBeNull()
+        expect(localSavedAtUpdates).toEqual([])
+        expect(localSaveCalls).toEqual([{ silent: false, force: true }])
+        expect(statusCalls.at(-1)?.notice.tone).toBe("error")
+        expect(statusCalls.at(-1)?.notice.text).toContain("로컬 초안")
+        expect(statusCalls.at(-1)?.notice.text).toContain("http://")
+        expect(statusCalls.at(-1)?.target).toBe("page")
+
+        // 3. Clearing canonicalUrl (empty string) intentionally sends null, updates baseline, and cleans up submitted local draft
+        const clearOk = await executeServerTempDraftSave({
+          ...commonInput,
+          silent: true,
+          postCanonicalUrl: "   ",
+        })
+        expect(clearOk).toBe(true)
+        expect(capturedBodies).toHaveLength(1)
+        expect(capturedBodies[0]?.canonicalUrl).toBeNull()
+        expect(storage.getItem(draftStorageKey)).toBeNull()
+
+        // 4. Fallback Mod+S handler (when onSaveServerTempDraft is absent) also fails closed without fetch
+        const shortcutLocalSaveCalls: Array<{ silent?: boolean; force?: boolean } | undefined> = []
+        const shortcutStatuses: Array<{ notice: { tone: string; text: string }; target?: string }> = []
+        const root = createRoot(rootContainer)
+        const ShortcutProbe = () => {
+          useEditorStudioKeyboardShortcuts({
+            isTempDraftMode: true,
+            editorMode: "edit",
+            postId: "99",
+            postVersion: 1,
+            postTitle: "Draft",
+            postSummary: "",
+            postSummarySource: "NONE",
+            effectiveThumbnailUrl: "",
+            getCurrentPostContent: () => "Draft body",
+            composeEditorContent: (c) => c,
+            postTags: [],
+            postCategory: "",
+            postCanonicalUrl: "https://",
+            saveLocalDraft: (options) => {
+              shortcutLocalSaveCalls.push(options)
+            },
+            setPostVersion: () => undefined,
+            setPublishStatus: (notice, target) => {
+              shortcutStatuses.push({ notice, target })
+            },
+            loadingKey: "",
+            setLoadingKey: () => undefined,
+          })
+          return null
+        }
+
+        try {
+          await act(async () => {
+            root.render(
+              createElement(ClientLanguageProvider, {
+                initialLanguage: "en",
+                children: createElement(ShortcutProbe),
+              })
+            )
+          })
+          await act(async () => {
+            const event = new Event("keydown", { cancelable: true }) as KeyboardEvent & {
+              key: string
+              metaKey: boolean
+              ctrlKey: boolean
+              shiftKey: boolean
+              isComposing: boolean
+              keyCode: number
+            }
+            Object.defineProperties(event, {
+              key: { value: "s" },
+              metaKey: { value: true },
+              ctrlKey: { value: false },
+              shiftKey: { value: false },
+              isComposing: { value: false },
+              keyCode: { value: 83 },
+            })
+            window.dispatchEvent(event)
+          })
+          expect(capturedBodies).toHaveLength(1)
+          expect(shortcutLocalSaveCalls).toEqual([{ silent: false, force: true }])
+          expect(shortcutStatuses.at(-1)?.notice.tone).toBe("error")
+          expect(shortcutStatuses.at(-1)?.notice.text).toContain("Saved locally.")
+        } finally {
+          await act(async () => {
+            root.unmount()
+          })
+        }
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+  })
+
+  test("PRIVATE visibility allows clearing and auto-clears lingering schedule across modal and inspector", async () => {
+    const futureIso = new Date(Date.now() + 3_600_000).toISOString()
+
+    // SSR renders immediate clear button when PRIVATE has a lingering schedule
+    const modalHtml = renderThemed(
+      createElement(EditorStudioPublishMetadataSection, {
+        postVisibility: "PRIVATE",
+        postScheduledAt: futureIso,
         postSeriesName: "",
         postSeriesOrder: null,
-        postCanonicalUrl: "https://",
-        getCurrentPostContent: () => "Draft body",
-        applyCanonicalWriteResponse: () => ({ summary: "Auto summary", summarySource: "EXTRACTED", intent: { kind: "auto" } }),
-        buildSuccessfulWriteFingerprintPayload: () => ({
-          title: "Draft",
-          content: "Draft body",
-          tags: [],
-          category: "",
-          thumbnailUrl: "",
-          thumbnailFocusX: 50,
-          thumbnailFocusY: 50,
-          thumbnailZoom: 1,
-          summary: "Auto summary",
-          summarySource: "EXTRACTED",
-          summaryIntent: { kind: "auto" },
-          visibility: "PUBLIC_LISTED",
-        }),
-        buildEditorStateFingerprint: () => "fp-1",
-        dedupeStrings: (items) => items,
-        serverBaselineEditorFingerprintRef: { current: "" },
-        lastLocalDraftFingerprintRef: { current: "" },
-        signalLocalDraftBaselineReady: () => {},
-        setPostVersion: () => {},
-        setLocalDraftSavedAt: () => {},
-        setLoadingKey: () => {},
-        setLastSaveError: () => {},
-        setPublishStatus: () => {},
-      })
-      expect(ok).toBe(true)
-      expect(capturedBodies).toHaveLength(1)
-      expect(capturedBodies[0]?.canonicalUrl).toBeNull()
-    } finally {
-      globalThis.fetch = originalFetch
-    }
+        postCanonicalUrl: "",
+        seriesCatalog: [],
+        onScheduledAtChange: () => {},
+        onSeriesNameChange: () => {},
+        onSeriesOrderChange: () => {},
+        onCanonicalUrlChange: () => {},
+      }),
+      "ko"
+    )
+    expect(modalHtml).toContain('data-testid="publish-schedule-private-clear"')
+    expect(modalHtml).toContain("예약 해제")
+
+    const inspectorHtml = renderThemed(
+      createElement(EditorStudioInspectorPublishingFields, {
+        postVisibility: "PRIVATE",
+        postScheduledAt: futureIso,
+        postSeriesName: "",
+        postSeriesOrder: null,
+        postCanonicalUrl: "",
+        seriesCatalog: [],
+        onScheduledAtChange: () => {},
+        onSeriesNameChange: () => {},
+        onSeriesOrderChange: () => {},
+        onCanonicalUrlChange: () => {},
+      }),
+      "ko"
+    )
+    expect(inspectorHtml).toContain("예약 해제")
+    expect(inspectorHtml).not.toMatch(/<button[^>]*disabled[^>]*>예약 해제<\/button>/)
+
+    // Client mount auto-clears schedule when PRIVATE visibility is active
+    await withClientDom(async ({ rootContainer }) => {
+      const root = createRoot(rootContainer)
+      const clearedModal: string[] = []
+      const clearedInspector: string[] = []
+      try {
+        await act(async () => {
+          root.render(
+            createElement(ClientThemeProvider, {
+              theme: lightTheme,
+              children: createElement(ClientLanguageProvider, {
+                initialLanguage: "ko",
+                children: createElement(
+                  "div",
+                  null,
+                  createElement(ClientPublishMetadataSection, {
+                    key: "modal",
+                    postVisibility: "PRIVATE",
+                    postScheduledAt: futureIso,
+                    postSeriesName: "",
+                    postSeriesOrder: null,
+                    postCanonicalUrl: "",
+                    seriesCatalog: [],
+                    onScheduledAtChange: (val) => clearedModal.push(val),
+                    onSeriesNameChange: () => {},
+                    onSeriesOrderChange: () => {},
+                    onCanonicalUrlChange: () => {},
+                  }),
+                  createElement(ClientInspectorPublishingFields, {
+                    key: "inspector",
+                    postVisibility: "PRIVATE",
+                    postScheduledAt: futureIso,
+                    postSeriesName: "",
+                    postSeriesOrder: null,
+                    postCanonicalUrl: "",
+                    seriesCatalog: [],
+                    onScheduledAtChange: (val) => clearedInspector.push(val),
+                    onSeriesNameChange: () => {},
+                    onSeriesOrderChange: () => {},
+                    onCanonicalUrlChange: () => {},
+                  })
+                ),
+              }),
+            })
+          )
+        })
+        expect(clearedModal).toEqual([""])
+        expect(clearedInspector).toEqual([""])
+      } finally {
+        await act(async () => {
+          root.unmount()
+        })
+      }
+    })
   })
 })

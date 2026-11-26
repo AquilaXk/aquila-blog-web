@@ -168,14 +168,21 @@ export const EditorStudioPublishMetadataSection = ({
   const { language } = useLanguage()
   const [clientMinLocal, setClientMinLocal] = useState("")
   const isPrivate = postVisibility === "PRIVATE"
-  const isScheduled = Boolean(postScheduledAt.trim()) && !isPrivate
+  const hasScheduledAt = Boolean(postScheduledAt.trim())
+  const isScheduled = hasScheduledAt && !isPrivate
 
   useEffect(() => {
     setClientMinLocal(toLocalDateTimeInputValue(new Date().toISOString()))
   }, [])
 
+  useEffect(() => {
+    if (isPrivate && postScheduledAt.trim()) {
+      onScheduledAtChange("")
+    }
+  }, [isPrivate, onScheduledAtChange, postScheduledAt])
+
   const localInputValue = toLocalDateTimeInputValue(postScheduledAt)
-  const isPastSchedule = Boolean(postScheduledAt.trim()) && !isScheduleTimestampValid(postScheduledAt)
+  const isPastSchedule = !isPrivate && hasScheduledAt && !isScheduleTimestampValid(postScheduledAt)
   const isInvalidCanonical = Boolean(postCanonicalUrl.trim()) && !normalizeSafeCanonicalUrl(postCanonicalUrl)
 
   return (
@@ -184,8 +191,8 @@ export const EditorStudioPublishMetadataSection = ({
       <ScheduleModeRow>
         <ScheduleChoiceButton
           type="button"
-          $active={!isScheduled}
-          aria-pressed={!isScheduled}
+          $active={!hasScheduledAt}
+          aria-pressed={!hasScheduledAt}
           onClick={() => onScheduledAtChange("")}
         >
           {adminT("editorScheduleNow", language)}
@@ -209,7 +216,19 @@ export const EditorStudioPublishMetadataSection = ({
       </ScheduleModeRow>
 
       {isPrivate ? (
-        <FieldHelp>{adminT("editorSchedulePrivateHint", language)}</FieldHelp>
+        <ScheduleInputRow>
+          <FieldHelp>{adminT("editorSchedulePrivateHint", language)}</FieldHelp>
+          {hasScheduledAt ? (
+            <ScheduleChoiceButton
+              type="button"
+              $active={false}
+              data-testid="publish-schedule-private-clear"
+              onClick={() => onScheduledAtChange("")}
+            >
+              {adminT("editorScheduleClear", language)}
+            </ScheduleChoiceButton>
+          ) : null}
+        </ScheduleInputRow>
       ) : isScheduled ? (
         <ScheduleInputRow>
           <input

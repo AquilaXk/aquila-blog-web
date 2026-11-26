@@ -491,6 +491,14 @@ export const EditorStudioWorkspaceController = ({
     setPublishModalNotice, setTagDraft, tagDraft,
   })
 
+  const handlePostVisibilityChange = useCallback(
+    (nextVisibility: PostVisibility) => {
+      setPostVisibility(nextVisibility)
+      if (nextVisibility === "PRIVATE") setPostScheduledAt("")
+    },
+    [setPostScheduledAt]
+  )
+
   return (
     <EditorStudioWorkspaceControllerRootView
       props={{
@@ -515,7 +523,8 @@ export const EditorStudioWorkspaceController = ({
         publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef, previewThumbTransformRef,
         resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, saveLocalDraft, selectLocalDraftCandidate,
         restoredLocalDraft, result, safePreviewThumbnail, serverBaselineEditorFingerprintRef, sessionMember,
-        setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError, setPostVisibility,
+        setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError,
+        setPostVisibility: handlePostVisibilityChange,
         setTagDraft, tagDraft, thumbnailImageFileInputRef, thumbnailImageFileName,
       }}
     />

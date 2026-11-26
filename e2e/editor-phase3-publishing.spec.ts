@@ -21,6 +21,7 @@ const setupAdminEditorRoutes = async (
   page: Page,
   options?: {
     initialContent?: string
+    initialCanonicalUrl?: string
     onPutPost?: (body: Record<string, unknown>) => void
     onPostCreate?: (body: Record<string, unknown>) => void
     onAdmGetPost?: (id: number) => void
@@ -41,6 +42,7 @@ const setupAdminEditorRoutes = async (
         listed: false,
         tempDraft: true,
         version: 1,
+        ...(options?.initialCanonicalUrl ? { canonicalUrl: options.initialCanonicalUrl } : {}),
       },
     ],
     [
@@ -221,8 +223,14 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
     await modal.getByTestId("publish-series-name-input").fill("Compiler Design")
     await modal.getByTestId("publish-series-order-input").fill("3")
 
-    // Switch to scheduled publishing
+    // Switch to scheduled publishing, verify switching to PRIVATE auto-clears schedule without trapping preflight, then re-schedule
     await modal.getByRole("button", { name: "예약 발행" }).click()
+    await expect(modal.getByTestId("publish-schedule-input")).toBeVisible()
+    await modal.getByRole("radio", { name: /비공개/ }).click()
+    await expect(modal.getByTestId("publish-schedule-input")).toHaveCount(0)
+    await expect(modal.getByTestId("editor-publish-submit-button")).toHaveText("새 글 작성")
+    await modal.getByRole("radio", { name: /전체 공개/ }).click()
+    await modal.getByTestId("publish-schedule-toggle").click()
     await expect(modal.getByTestId("publish-schedule-input")).toBeVisible()
 
     const submitButton = modal.getByTestId("editor-publish-submit-button")
@@ -424,7 +432,7 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
     await expect(editorTextbox.locator(".cm-line").nth(2)).toContainText("First block Docs (v2)")
   })
 
-  test("EN mode localizes thumbnail controls and body aria-label, and temp autosave sanitizes partial canonical URL", async ({
+  test("EN mode localizes thumbnail controls and body aria-label, and invalid canonical URL fails closed without overwriting server or local draft", async ({
     page,
   }) => {
     const tempDraftBodies: Array<Record<string, unknown>> = []
@@ -432,22 +440,40 @@ test.describe("Editor Phase 3 multi-draft, publishing metadata, mobile & public 
       window.localStorage.setItem("aquila_blog_lang", "en")
     })
     await setupAdminEditorRoutes(page, {
+      initialCanonicalUrl: "https://existing.example.com/posts/990",
       onPutTempDraft: (body) => tempDraftBodies.push(body),
     })
     await page.goto("/admin/editor/990")
 
     await expect(page.getByTestId("markdown-editor-content")).toHaveAttribute("aria-label", "Markdown body")
 
-    // Open inspector if needed, type partial invalid canonical URL, and verify autosave sends null
+    // Open inspector, enter partial invalid canonical URL, and verify autosave + Mod+S fail closed without overwriting server canonicalUrl
     const inspectorToggle = page.getByTestId("editor-inspector-toggle")
     if ((await inspectorToggle.getAttribute("aria-pressed")) !== "true") {
       await inspectorToggle.click()
     }
     const inspector = page.getByTestId("editor-inspector-aside")
     const canonicalInput = inspector.getByLabel("Canonical URL (cross-post)")
+    await expect(canonicalInput).toHaveValue("https://existing.example.com/posts/990")
     await canonicalInput.fill("https://")
-    await expect.poll(() => tempDraftBodies.length, { timeout: 6000 }).toBeGreaterThan(0)
-    expect(tempDraftBodies[tempDraftBodies.length - 1]?.canonicalUrl).toBeNull()
+    await page.waitForTimeout(2800)
+    expect(tempDraftBodies).toHaveLength(0)
+
+    await page.keyboard.press("ControlOrMeta+s")
+    await expect(page.getByText(/Saved locally\./)).toBeVisible()
+    expect(tempDraftBodies).toHaveLength(0)
+    const savedLocalDraftRaw = await page.evaluate(() => {
+      for (let idx = 0; idx < window.localStorage.length; idx += 1) {
+        const key = window.localStorage.key(idx)
+        if (key && key.startsWith("admin.editor.localDraft.post.990.")) return window.localStorage.getItem(key)
+      }
+      return null
+    })
+    expect(savedLocalDraftRaw).toContain('"canonicalUrl":"https://"')
+
+    await canonicalInput.fill("https://origin.example.com/posts/990")
+    await expect.poll(() => tempDraftBodies.length, { timeout: 6000 }).toBe(1)
+    expect(tempDraftBodies[0]?.canonicalUrl).toBe("https://origin.example.com/posts/990")
 
     // Open publish modal and verify localized thumbnail panel controls
     await page.getByTestId("editor-publish-open-button").click()

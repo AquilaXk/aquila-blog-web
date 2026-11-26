@@ -277,6 +277,16 @@ export type ServerTempDraftSaveExecutionInput = {
   setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
 }
 
+export const hasInvalidCanonicalUrlInput = (postCanonicalUrl: string): boolean => {
+  const trimmed = postCanonicalUrl.trim()
+  return trimmed.length > 0 && !normalizeSafeCanonicalUrl(trimmed)
+}
+
+export const formatInvalidCanonicalDraftSaveNotice = (isEn: boolean): string =>
+  isEn
+    ? `Saved locally. ${adminT("editorCanonicalUrlInvalid", "en")}`
+    : `로컬 초안에 안전 저장했습니다. ${adminT("editorCanonicalUrlInvalid", "ko")}`
+
 export const executeServerTempDraftSave = async ({
   silent, isEn, normalizedPostId, postTitle, currentPostContent, composed, postVersion,
   effectiveTags, effectiveCategory, effectiveThumbnailUrl, postSummary, postSummarySource,
@@ -287,6 +297,13 @@ export const executeServerTempDraftSave = async ({
   saveLocalDraft, setPostVersion, setLocalDraftSavedAt, setLoadingKey, setLastSaveError,
   setPublishStatus,
 }: ServerTempDraftSaveExecutionInput): Promise<boolean> => {
+  if (hasInvalidCanonicalUrlInput(postCanonicalUrl)) {
+    if (!silent) {
+      saveLocalDraft?.({ silent: false, force: true })
+      setPublishStatus({ tone: "error", text: formatInvalidCanonicalDraftSaveNotice(isEn) }, "page")
+    }
+    return false
+  }
   const summaryPayload = buildTempDraftSaveSummaryFields(postSummary, postSummarySource)
   try {
     if (!silent) {

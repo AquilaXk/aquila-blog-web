@@ -6,6 +6,10 @@ import { normalizeCategoryValue } from "src/libs/utils"
 import type { RsData } from "src/types"
 import { normalizeSafeCanonicalUrl } from "./editorStudioMetaModel"
 import type { EditorMode } from "./editorStudioState"
+import {
+  formatInvalidCanonicalDraftSaveNotice,
+  hasInvalidCanonicalUrlInput,
+} from "./useEditorStudioPersistenceHelpers"
 import { extractPendingTagDraftValues } from "./useEditorStudioPublishModalFlow"
 
 type NoticeTone = "idle" | "loading" | "success" | "error"
@@ -236,6 +240,14 @@ export const useEditorStudioKeyboardShortcuts = ({
         if (pendingTags.length > 0) {
           state.addTagsToPost?.(pendingTags)
           state.setTagDraft?.("")
+        }
+        if (hasInvalidCanonicalUrlInput(state.postCanonicalUrl)) {
+          state.saveLocalDraft({ silent: false, force: true })
+          state.setPublishStatus(
+            { tone: "error", text: formatInvalidCanonicalDraftSaveNotice(state.isEn) },
+            "page"
+          )
+          return
         }
         const effectiveTags =
           pendingTags.length > 0

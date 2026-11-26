@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { useEffect } from "react"
 import { useLanguage } from "src/libs/language"
 import { adminT } from "./adminI18n"
 import { adminStatusDangerText } from "./adminColorTokens"
@@ -54,6 +55,12 @@ export const EditorStudioInspectorPublishingFields = ({
   const isPrivate = postVisibility === "PRIVATE"
   const isInvalidCanonical = Boolean(postCanonicalUrl.trim()) && !normalizeSafeCanonicalUrl(postCanonicalUrl)
 
+  useEffect(() => {
+    if (isPrivate && postScheduledAt.trim()) {
+      onScheduledAtChange("")
+    }
+  }, [isPrivate, onScheduledAtChange, postScheduledAt])
+
   return (
     <PublishingFieldGroup data-testid="editor-inspector-publishing">
       <EditorSectionEyebrow aria-hidden="true">
@@ -70,7 +77,7 @@ export const EditorStudioInspectorPublishingFields = ({
           />
           <SecondaryButton
             type="button"
-            disabled={!postScheduledAt}
+            disabled={!postScheduledAt.trim()}
             onClick={() => onScheduledAtChange("")}
           >
             {adminT("editorScheduleClear", language)}
