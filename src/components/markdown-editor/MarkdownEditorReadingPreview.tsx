@@ -1,7 +1,14 @@
+import { useMemo, useSyncExternalStore } from "react"
 import dynamic from "next/dynamic"
 import styled from "@emotion/styled"
 import { useLanguage } from "../../libs/language"
+import { buildPostInternalLinkTargets } from "../../libs/markdown/internalWikilinkResolver"
 import { adminT } from "../../routes/Admin/adminI18n"
+import {
+  getRegisteredPostSuggestions,
+  subscribeInternalPostSuggestions,
+  type InternalPostSuggestion,
+} from "./markdownEditorCompletions"
 
 const ReadingPreviewLoadingPlaceholder = () => {
   const { language } = useLanguage()
@@ -39,21 +46,43 @@ const ReadingPreviewCanvas = styled.div`
   }
 `
 
+const EMPTY_POST_SUGGESTIONS: InternalPostSuggestion[] = []
+const getServerPostSuggestions = () => EMPTY_POST_SUGGESTIONS
+
 type MarkdownEditorReadingPreviewProps = {
   value: string
   disableMermaid?: boolean
+  internalLinkTargets?: Readonly<Record<string, string>>
 }
 
 export const MarkdownEditorReadingPreview = ({
   value,
   disableMermaid = false,
-}: MarkdownEditorReadingPreviewProps) => (
-  <ReadingPreviewRoot
-    className="aq-editor-reading-surface"
-    data-testid="markdown-editor-reading-surface"
-  >
-    <ReadingPreviewCanvas>
-      <DynamicMarkdownRenderer content={value} disableMermaid={disableMermaid} />
-    </ReadingPreviewCanvas>
-  </ReadingPreviewRoot>
-)
+  internalLinkTargets,
+}: MarkdownEditorReadingPreviewProps) => {
+  const registeredSuggestions = useSyncExternalStore(
+    subscribeInternalPostSuggestions,
+    getRegisteredPostSuggestions,
+    getServerPostSuggestions
+  )
+  const resolvedInternalLinkTargets = useMemo(() => {
+    if (internalLinkTargets) return internalLinkTargets
+    const computed = buildPostInternalLinkTargets(value, registeredSuggestions)
+    return Object.keys(computed).length > 0 ? computed : undefined
+  }, [internalLinkTargets, registeredSuggestions, value])
+
+  return (
+    <ReadingPreviewRoot
+      className="aq-editor-reading-surface"
+      data-testid="markdown-editor-reading-surface"
+    >
+      <ReadingPreviewCanvas>
+        <DynamicMarkdownRenderer
+          content={value}
+          disableMermaid={disableMermaid}
+          internalLinkTargets={resolvedInternalLinkTargets}
+        />
+      </ReadingPreviewCanvas>
+    </ReadingPreviewRoot>
+  )
+}

@@ -1,6 +1,6 @@
 import type { ChangeEvent, ClipboardEvent as ReactClipboardEvent, Dispatch, SetStateAction } from "react"
 import { useCallback } from "react"
-import { getApiBaseUrl } from "src/apis/backend/client"
+import { fetchRawApiMutation } from "src/apis/backend/client"
 import { useLanguage, type SiteLanguage } from "src/libs/language"
 import { parseStandaloneMarkdownImageLine } from "src/libs/markdown/renderingImageModel"
 import {
@@ -112,7 +112,7 @@ export const useEditorStudioPersistenceUploads = ({
     const requestUpload = async () => {
       const formData = new FormData()
       formData.append("file", prepared.file, prepared.file.name)
-      return await fetch(`${getApiBaseUrl()}/post/api/v1/posts/images`, {
+      return await fetchRawApiMutation("/post/api/v1/posts/images", {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -184,7 +184,7 @@ export const useEditorStudioPersistenceUploads = ({
     formData.append("file", file, file.name)
 
     const response = await uploadWithConflictRetry(async () =>
-      fetch(`${getApiBaseUrl()}/post/api/v1/posts/files`, {
+      fetchRawApiMutation("/post/api/v1/posts/files", {
         method: "POST",
         credentials: "include",
         body: formData,

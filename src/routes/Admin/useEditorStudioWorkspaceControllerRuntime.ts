@@ -8,7 +8,7 @@ import {
   useEffect,
   useRef,
 } from "react"
-import { getFeedPostsPage, invalidatePublicPostReadCaches } from "src/apis/backend/posts"
+import { getFeedPostsPage, getPublicWikilinkCatalogPosts, invalidatePublicPostReadCaches } from "src/apis/backend/posts"
 import { registerInternalPostSuggestions } from "src/components/markdown-editor/markdownEditorCompletions"
 import { revalidateSavedPost } from "./editorPostSaveRefresh"
 import {
@@ -75,20 +75,33 @@ export const useEditorStudioWorkspaceControllerRuntime = ({
 
   useEffect(() => {
     let cancelled = false
-    void getFeedPostsPage({ page: 1, pageSize: 50 })
-      .then((page) => {
-        if (cancelled || !Array.isArray(page?.posts)) return
-        registerInternalPostSuggestions(
-          page.posts
-            .filter((post) => Boolean(post?.title?.trim()))
-            .map((post) => ({
-              id: post.id,
-              slug: post.slug || String(post.id),
-              title: post.title.trim(),
-            }))
-        )
+    const registerCatalogEntries = (
+      entries: Array<{ id?: string | number; slug?: string; title?: string }>
+    ) => {
+      if (cancelled) return
+      registerInternalPostSuggestions(
+        entries
+          .filter((post) => Boolean(post?.title?.trim()))
+          .map((post) => ({
+            id: post.id,
+            slug: post.slug || (post.id !== undefined ? String(post.id) : undefined),
+            title: post.title!.trim(),
+          }))
+      )
+    }
+
+    void getPublicWikilinkCatalogPosts()
+      .then((catalogEntries) => {
+        if (Array.isArray(catalogEntries)) {
+          registerCatalogEntries(catalogEntries)
+        }
       })
-      .catch(() => undefined)
+      .catch(async () => {
+        const page = await getFeedPostsPage({ page: 1, pageSize: 30 }).catch(() => null)
+        if (Array.isArray(page?.posts)) {
+          registerCatalogEntries(page.posts)
+        }
+      })
     return () => {
       cancelled = true
     }

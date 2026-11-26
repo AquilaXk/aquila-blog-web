@@ -45,6 +45,7 @@ export type MarkdownEditorFocusRequest = (options?: MarkdownEditorFocusRequestOp
 
 type MarkdownEditorProps = {
   value: string; disabled?: boolean; disableMermaid?: boolean
+  internalLinkTargets?: Readonly<Record<string, string>>
   onRequestFocusTitle?: () => void
   onChange: (markdown: string, meta?: MarkdownChangeMeta) => void
   onSelectionChange?: (selection: MarkdownEditorFocusSelection) => void
@@ -100,7 +101,7 @@ const renderFindReplaceSection = (
 }
 
 export const MarkdownEditor = ({
-  value, disabled = false, disableMermaid = false, onRequestFocusTitle, onChange,
+  value, disabled = false, disableMermaid = false, internalLinkTargets, onRequestFocusTitle, onChange,
   onSelectionChange, onFlushMarkdownReady, onFocusRequestReady, onRequestSave,
   onUploadingChange, onUploadImage, onUploadFile,
 }: MarkdownEditorProps) => {
@@ -418,7 +419,13 @@ export const MarkdownEditor = ({
           onRequestFocusTitle={onRequestFocusTitle} onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste} onDragOver={handleDragOver} onDropCapture={handleDrop}
         />
-        {viewMode === "reading" ? <MarkdownEditorReadingPreview value={draftValue} disableMermaid={disableMermaid} /> : null}
+        {viewMode === "reading" ? (
+          <MarkdownEditorReadingPreview
+            value={draftValue}
+            disableMermaid={disableMermaid}
+            internalLinkTargets={internalLinkTargets}
+          />
+        ) : null}
       </LiveEditorBody>
       <MarkdownEditorSlashMenu
         isOpen={slashMenuState.isOpen} position={slashMenuState.position}

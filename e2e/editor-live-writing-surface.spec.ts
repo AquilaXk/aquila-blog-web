@@ -839,7 +839,10 @@ test.describe("live Markdown writing surface", () => {
   test("image and file uploads insert at the active document selection", async ({ page }) => {
     const source = "alpha\nomega"
     await routeAuthenticatedEditor(page, source)
+    const imageCsrfHeaders: Array<string | undefined> = []
+    const fileCsrfHeaders: Array<string | undefined> = []
     await page.route("**/post/api/v1/posts/images", async (route) => {
+      imageCsrfHeaders.push(route.request().headers()["x-aquila-csrf"])
       await fulfillJson(route, {
         resultCode: "201-1",
         msg: "uploaded",
@@ -850,6 +853,7 @@ test.describe("live Markdown writing surface", () => {
       })
     })
     await page.route("**/post/api/v1/posts/files", async (route) => {
+      fileCsrfHeaders.push(route.request().headers()["x-aquila-csrf"])
       await fulfillJson(route, {
         resultCode: "201-1",
         msg: "uploaded",
@@ -884,6 +888,8 @@ test.describe("live Markdown writing surface", () => {
     const result = await readMarkdown(page)
     expect(result.indexOf("report.pdf")).toBeLessThan(result.indexOf("omega"))
     expect(result.indexOf("body.png")).toBeLessThan(result.indexOf("omega"))
+    expect(imageCsrfHeaders).toEqual(["1"])
+    expect(fileCsrfHeaders).toEqual(["1"])
   })
 
   test("attachment replacement at document end preserves content and undo history", async ({ page }) => {
@@ -1643,6 +1649,79 @@ test.describe("live Markdown writing surface", () => {
     await expect(readingSurface.locator(".aq-wikilink")).toContainText("아키텍처 문서")
     await expect(readingSurface.locator("svg foreignObject .nodeLabel").first()).toBeVisible()
     await expect(readingSurface.locator("svg foreignObject br")).toHaveCount(1)
+  })
+
+  test("clipboard image paste and cover thumbnail upload include X-Aquila-CSRF header", async ({ page }) => {
+    await routeAuthenticatedEditor(page, "clipboard paste target")
+    const observedHeaders: Array<string | undefined> = []
+    await page.route("**/post/api/v1/posts/images", async (route) => {
+      observedHeaders.push(route.request().headers()["x-aquila-csrf"])
+      await fulfillJson(route, {
+        resultCode: "201-1",
+        msg: "uploaded",
+        data: {
+          key: `posts/upload-${observedHeaders.length}.png`,
+          url: `http://127.0.0.1:3000/post/api/v1/images/posts/upload-${observedHeaders.length}.png`,
+        },
+      })
+    })
+
+    await openEditorDraft(page)
+    await editorContent(page).click()
+    await editorContent(page).evaluate((element, pngBytes) => {
+      const transfer = new DataTransfer()
+      const file = new File([new Uint8Array(pngBytes)], "pasted.png", { type: "image/png" })
+      transfer.items.add(file)
+      element.dispatchEvent(new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: transfer,
+      }))
+    }, Array.from(onePixelPng))
+
+    await expect.poll(() => readMarkdown(page)).toContain(
+      "![pasted.png](http://127.0.0.1:3000/post/api/v1/images/posts/upload-1.png"
+    )
+
+    await page.locator('[data-focus-mode] > input[type="file"][accept="image/*"]').setInputFiles({
+      name: "cover.png",
+      mimeType: "image/png",
+      buffer: onePixelPng,
+    })
+
+    await expect.poll(() => observedHeaders.length).toBe(2)
+    expect(observedHeaders).toEqual(["1", "1"])
+  })
+
+  test("wikilink autocomplete loads full catalog (>30 posts) and reading preview resolves internalLinkTargets", async ({ page }) => {
+    const catalogItems = Array.from({ length: 35 }, (_, idx) => ({
+      id: idx + 1,
+      title: idx === 34 ? "Archive Deep Dive" : `Catalog Note ${idx + 1}`,
+      createdAt: "2026-11-01T00:00:00Z",
+    }))
+    await page.route("**/post/api/v1/posts/wikilink-catalog", async (route) => {
+      await fulfillJson(route, { items: catalogItems })
+    })
+    await routeAuthenticatedEditor(page, "Intro paragraph\n\n")
+    await openEditorDraft(page)
+
+    const editor = editorContent(page)
+    await editor.click()
+    await page.keyboard.press("End")
+    await page.keyboard.type("[[Archive")
+
+    const completionOption = page.locator(".cm-tooltip-autocomplete [role='option']", { hasText: "Archive Deep Dive" })
+    await expect(completionOption).toBeVisible()
+    await completionOption.click()
+
+    await expect.poll(() => readMarkdown(page)).toContain("[[Archive Deep Dive]]")
+
+    await page.getByRole("button", { name: "읽기 뷰" }).click()
+    const readingSurface = page.getByTestId("markdown-editor-reading-surface")
+    await expect(readingSurface).toBeVisible()
+    const resolvedLink = readingSurface.locator('.aq-wikilink[data-wikilink-resolved="true"][href="/posts/35"]')
+    await expect(resolvedLink).toBeVisible()
+    await expect(resolvedLink).toHaveText("Archive Deep Dive")
   })
 })
 

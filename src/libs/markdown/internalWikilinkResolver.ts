@@ -42,7 +42,7 @@ const assignResolvedTarget = (
 
 export const buildPostInternalLinkTargets = (
   markdown: string,
-  catalogPosts: readonly { id: string | number; title: string; slug?: string }[]
+  catalogPosts: readonly { id?: string | number; title: string; slug?: string }[]
 ): Record<string, string> => {
   if (!markdown || !markdown.includes("[[") || catalogPosts.length === 0) return {}
   const spans = findWikilinkSpans(markdown)

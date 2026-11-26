@@ -50,6 +50,20 @@ export type InternalPostSuggestion = {
 
 let registeredPostSuggestions: InternalPostSuggestion[] = []
 let wikilinkPostCompletionOptions: Completion[] = []
+const internalPostSuggestionListeners = new Set<() => void>()
+
+const notifyInternalPostSuggestionListeners = () => {
+  for (const listener of internalPostSuggestionListeners) {
+    listener()
+  }
+}
+
+export const subscribeInternalPostSuggestions = (listener: () => void): (() => void) => {
+  internalPostSuggestionListeners.add(listener)
+  return () => {
+    internalPostSuggestionListeners.delete(listener)
+  }
+}
 
 export const registerInternalPostSuggestions = (posts: InternalPostSuggestion[]) => {
   registeredPostSuggestions = posts
@@ -59,6 +73,7 @@ export const registerInternalPostSuggestions = (posts: InternalPostSuggestion[])
     detail: post.slug ? `Blog post (/posts/${post.slug})` : "Blog post",
     apply: `${post.title}]]`,
   }))
+  notifyInternalPostSuggestionListeners()
 }
 
 export const getRegisteredPostSuggestions = () => registeredPostSuggestions
@@ -66,6 +81,7 @@ export const getRegisteredPostSuggestions = () => registeredPostSuggestions
 export const clearRegisteredPostSuggestions = () => {
   registeredPostSuggestions = []
   wikilinkPostCompletionOptions = []
+  notifyInternalPostSuggestionListeners()
 }
 
 const headingCompletionsCache = new WeakMap<object, Completion[]>()

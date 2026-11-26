@@ -66,3 +66,25 @@
 **문제 배경.** 순수 TypeScript 파서·모델·단위 테스트만 수정하는 반복 라운드마다 로컬에서 전체 Next.js 프로덕션 빌드(`yarn build`), 번들 예산 측정(`yarn check:bundle-size`), 전체 브라우저 E2E 스위트를 매번 재실행하면 피드백 루프가 수십 분씩 지연되고 시스템 부하가 누적된다.
 
 **최종 결정과 트레이드오프.** `docs/AGENT-CONTEXT.md`의 최소 결정론적 검증 원칙에 따라 로컬에서는 변경된 계약을 직접 증명하는 가장 빠르고 결정론적인 검사(`yarn check:refactor-boundaries`, `yarn check:design-colors`, `yarn contracts:check`, `yarn type-check`, `yarn lint`, `yarn test:unit`)만 직렬로 실행하고, 전체 프로덕션 빌드·번들 예산·E2E 회귀 게이트는 원격 GitHub Actions CI(`Web CI`, `Web Security`, `CodeQL`, `SonarCloud`)가 커밋당 1회 검증하도록 역할을 분리했다. 또한 `pstack interrogate` 리뷰 판정 시 `lead-judgment.md`의 Nitpick Gravity 및 Hypothetical vs. Actual 기준을 엄격히 적용해 실제 버그·보안·유지보수 결함만 `Act On`으로 분류하고 사소한 취향 차이나 비현실적 가설은 `Noted` 또는 `Dismissed`로 판정해 불필요한 재작업 루프를 차단한다.
+
+## 7. 비공개 글 에디터 전용 열람 및 공개 상세 역링크 UI 미노출 정책 (2026-11-26 QA 확정)
+
+### 7-1. 비공개 글(`!published`) 열람 경계 단일화
+
+**문제 배경.** 이전 구현은 공개 상세 엔드포인트(`GET /post/api/v1/posts/{id}`)가 인증 컨텍스트를 받으면 `getAuthenticatedPostDetail`로 분기해 작성자·관리자의 비공개 글을 반환했고, 클라이언트 GET 정책 레지스트리도 `/post/api/v1/posts/[0-9]+`에 `credentials: "include"`를 남겼다.
+
+**최종 결정과 근거.**
+- 비공개 글과 임시글은 관리자 에디터(`/admin/editor/[id]` → `/post/api/v1/adm/posts/{id}`)에서만 열람한다.
+- 공개 상세 API(`/post/api/v1/posts/{id}`)와 공개 상세 페이지(`/posts/[id]`)는 로그인 여부와 무관하게 발행된 글(`published = true`)만 반환하며 미공개 글에는 `404`로 응답한다.
+- 이 경계로 공개 GET 경로가 `credentials: "omit"`과 동일 캐시 정책을 유지해 존재 여부 누출(`403` 대 `404`)과 인증 상태별 응답 편차를 없앴다.
+
+### 7-2. 공개 상세 하단 역링크(`backlinks`) UI 미노출 및 위키링크 카탈로그 연동
+
+**문제 배경.** 백엔드에 `GET /post/api/v1/posts/{id}/backlinks`와 `GET /post/api/v1/posts/wikilink-catalog`가 도입된 상태에서, 공개 글 상세 하단에 역링크 목록 UI를 노출할지와 에디터 내부 링크 자동완성·읽기 프리뷰를 어떻게 연결할지 결정이 필요했다.
+
+**고스타 오픈소스 저장소 조사 결과.**
+- `TryGhost/Ghost`, `adityatelange/hugo-PaperMod`, `shuding/nextra`, `timlrx/tailwind-nextjs-starter-blog`, `cotes2020/jekyll-theme-chirpy`, `fuma-nama/fumadocs`, `satnaing/astro-paper` 등 주요 블로그·문서 발행 저장소는 글 상세 하단을 태그·이전/다음 글·관련 글·댓글 중심으로 구성하며 별도 역링크 패널을 두지 않는다(역링크 그래프는 디지털 가든·지식 그래프 도구에 한정).
+
+**최종 결정과 트레이드오프.**
+- 공개 상세(`/posts/[id]`) UI는 기존 저자·태그·이전/다음 글·관련 글 구성을 유지하고 역링크 UI 섹션을 추가하지 않는다.
+- 대신 에디터 `[[` 자동완성과 에디터 읽기 뷰(`MarkdownEditorReadingPreview`)는 `GET /post/api/v1/posts/wikilink-catalog`(실패 시 피드 폴백)를 구독해 30건 피드 상한 없이 내부 글 링크를 해석하고, 클라이언트 `GET_REQUEST_POLICY_REGISTRY`에는 `wikilink-catalog`와 `backlinks`를 `credentials: "omit"`·`revalidate` 정책으로 등록해 백엔드 공개 계약과 일관성을 유지한다.

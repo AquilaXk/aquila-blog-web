@@ -6,8 +6,10 @@ import {
   wikilinkCompletionSource,
   registerInternalPostSuggestions,
   clearRegisteredPostSuggestions,
+  subscribeInternalPostSuggestions,
   CORE_CODE_LANGUAGES,
 } from "../../src/components/markdown-editor/markdownEditorCompletions"
+import { buildPostInternalLinkTargets } from "../../src/libs/markdown/internalWikilinkResolver"
 
 const createMockContext = (docText: string, pos: number): CompletionContext => {
   const state = EditorState.create({ doc: docText })
@@ -116,5 +118,38 @@ test.describe("markdown editor completions model", () => {
     const result = wikilinkCompletionSource(context)
 
     expect(result).toBeNull()
+  })
+
+  test("supports catalogs exceeding 30 items and notifies preview subscribers on register and clear", () => {
+    let notifications = 0
+    const unsubscribe = subscribeInternalPostSuggestions(() => {
+      notifications += 1
+    })
+
+    const suggestions = Array.from({ length: 45 }, (_, index) => ({
+      id: index + 1,
+      slug: String(index + 1),
+      title: `Catalog Entry ${index + 1}`,
+    }))
+    registerInternalPostSuggestions(suggestions)
+    expect(notifications).toBe(1)
+
+    const doc = "Reference [["
+    const result = wikilinkCompletionSource(createMockContext(doc, doc.length))
+    expect(result?.options).toHaveLength(45)
+    expect(result?.options).toContainEqual(
+      expect.objectContaining({
+        label: "Catalog Entry 45",
+        apply: "Catalog Entry 45]]",
+        detail: "Blog post (/posts/45)",
+      })
+    )
+
+    const targets = buildPostInternalLinkTargets("See [[Catalog Entry 45|Deep Link]].", suggestions)
+    expect(targets).toEqual({ "catalog entry 45": "/posts/45" })
+
+    clearRegisteredPostSuggestions()
+    expect(notifications).toBe(2)
+    unsubscribe()
   })
 })

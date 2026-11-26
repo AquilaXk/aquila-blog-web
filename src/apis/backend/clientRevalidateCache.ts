@@ -5,7 +5,7 @@ type RevalidateCacheEntry = {
   payload: unknown
 }
 
-const isServer = typeof window === "undefined"
+const isServer = () => typeof window === "undefined"
 const browserRevalidateCache = new Map<string, RevalidateCacheEntry>()
 
 const hasNoStoreCacheControl = (cacheControlHeader: string | null) =>
@@ -14,7 +14,7 @@ const hasNoStoreCacheControl = (cacheControlHeader: string | null) =>
     .some((directive) => directive.trim().toLowerCase() === "no-store") ?? false
 
 export const getRevalidateCacheEntry = (url: string) => {
-  if (isServer) return null
+  if (isServer()) return null
   const cached = browserRevalidateCache.get(url)
   if (!cached) return null
   return cached
@@ -26,7 +26,7 @@ export const setRevalidateCacheEntry = (
   payload: unknown,
   cacheControlHeader: string | null,
 ) => {
-  if (isServer) return
+  if (isServer()) return
   if (hasNoStoreCacheControl(cacheControlHeader)) {
     browserRevalidateCache.delete(url)
     return
@@ -48,7 +48,7 @@ export const refreshRevalidateCacheEntry = (
   etagHeader: string | null,
   cacheControlHeader: string | null,
 ) => {
-  if (isServer) return
+  if (isServer()) return
   if (hasNoStoreCacheControl(cacheControlHeader)) {
     browserRevalidateCache.delete(url)
     return
@@ -62,7 +62,7 @@ export const refreshRevalidateCacheEntry = (
 }
 
 export const evictBrowserRevalidatePayloadCacheEntries = (predicate: (url: string) => boolean) => {
-  if (isServer) return
+  if (isServer()) return
 
   const cacheKeysToDelete: string[] = []
   browserRevalidateCache.forEach((_, url) => {

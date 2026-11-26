@@ -12,9 +12,11 @@ import {
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080"
 const DEFAULT_API_FETCH_TIMEOUT_MS = 12_000
+export const DEFAULT_UPLOAD_TIMEOUT_MS = 90_000
 const DEFAULT_GET_TRANSIENT_RETRY_COUNT = 1
 const DEFAULT_GET_TRANSIENT_RETRY_DELAY_MS = 120
 const CSRF_PREFLIGHT_HEADER = "X-Aquila-CSRF"
+export const CSRF_PREFLIGHT_HEADERS = { [CSRF_PREFLIGHT_HEADER]: "1" } as const
 const GET_RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
 
 type GetCacheMode = "revalidate" | "no-store"
@@ -58,7 +60,16 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
     policy: { cacheMode: "no-store", retryCount: 0, timeoutMs: 8_000 },
   },
   {
-    matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|sitemap|bootstrap|related\/author)(\/|$)/i,
+    matcher: /^\/post\/api\/v1\/posts\/(feed|explore|search|tags|sitemap|bootstrap|related\/author|wikilink-catalog)(\/|$)/i,
+    policy: {
+      cacheMode: "revalidate",
+      retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
+      timeoutMs: 8_000,
+      credentials: "omit",
+    },
+  },
+  {
+    matcher: /^\/post\/api\/v1\/posts\/[0-9]+\/backlinks(\/|$)/i,
     policy: {
       cacheMode: "revalidate",
       retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
@@ -72,6 +83,7 @@ const GET_REQUEST_POLICY_REGISTRY: Array<{
       cacheMode: "revalidate",
       retryCount: DEFAULT_GET_TRANSIENT_RETRY_COUNT,
       timeoutMs: 8_000,
+      credentials: "omit",
     },
   },
   {
@@ -199,8 +211,8 @@ const resolveTimeoutMs = (path: string, init: ApiFetchOptions) => {
   }
   const isFormLikeBody = typeof FormData !== "undefined" && init.body instanceof FormData
 
-  if (normalizedPath.includes("/posts/images") || isFormLikeBody) {
-    return 90_000
+  if (normalizedPath.includes("/posts/images") || normalizedPath.includes("/posts/files") || isFormLikeBody) {
+    return DEFAULT_UPLOAD_TIMEOUT_MS
   }
 
   if (isReadMethod) {
@@ -515,4 +527,49 @@ export const apiFetch = async <T>(
   })
   browserInFlightGetRequests.set(inFlightKey, { url, promise: inFlightPromise as Promise<unknown> })
   return inFlightPromise
+}
+
+export const fetchRawApiMutation = async (
+  path: string,
+  init: RequestInit & { timeoutMs?: number } = {}
+): Promise<Response> => {
+  const safePath = normalizeApiRequestPath(path)
+  const { timeoutMs, ...requestInit } = init
+  const url = getApiRequestUrl(safePath)
+  const headers = new Headers(requestInit.headers || {})
+  const requestCredentials: RequestCredentials = requestInit.credentials ?? "include"
+  if (requestCredentials !== "omit" && !headers.has(CSRF_PREFLIGHT_HEADER)) {
+    headers.set(CSRF_PREFLIGHT_HEADER, "1")
+  }
+  const resolvedTimeoutMs =
+    typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? timeoutMs
+      : resolveTimeoutMs(safePath, { ...requestInit, method: requestInit.method ?? "POST" })
+  const { signal, cleanup } = createTimedSignal(requestInit.signal, resolvedTimeoutMs)
+
+  try {
+    return await fetch(url, {
+      ...requestInit,
+      method: requestInit.method ?? "POST",
+      credentials: requestCredentials,
+      headers,
+      signal,
+    })
+  } catch (error) {
+    if (requestInit.signal?.aborted) {
+      throw error
+    }
+    if (
+      (error instanceof DOMException && error.name === "TimeoutError") ||
+      (signal.reason instanceof DOMException && signal.reason.name === "TimeoutError")
+    ) {
+      throw new ApiTimeoutError(url, resolvedTimeoutMs)
+    }
+    if (error instanceof TypeError || error instanceof DOMException) {
+      throw new ApiNetworkError(url)
+    }
+    throw error
+  } finally {
+    cleanup()
+  }
 }
