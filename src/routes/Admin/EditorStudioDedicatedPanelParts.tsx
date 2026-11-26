@@ -75,7 +75,17 @@ export const EditorStudioStatusBar = styled.footer<{ $sidebarsOpen?: boolean }>`
   }
 
   @media (max-width: 820px) {
-    display: none;
+    right: 12px;
+    left: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 3px 9px;
+    gap: 8px;
+    min-height: 24px;
+    font-size: 10.5px;
+
+    > span:first-of-type {
+      display: none;
+    }
   }
 `
 

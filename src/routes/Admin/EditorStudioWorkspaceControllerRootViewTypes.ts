@@ -10,6 +10,7 @@ import type { LocalDraftSource } from "./editorStudioMetaModel"
 import type { LocalDraftFingerprintSnapshot } from "./useEditorStudioDraftLifecycleModel"
 import type { SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import type { PostVisibility, PublishActionType } from "./editorStudioState"
+import type { ApiPostDto } from "src/apis/backend/posts/PostApiDtos"
 
 export type EditorStudioDocumentSlice = {
   addTagsToPost: (tags: string[]) => void
@@ -50,6 +51,23 @@ export type EditorStudioDocumentSlice = {
   postTags: string[]
   postTitle: string
   postVisibility: PostVisibility
+  postScheduledAt: string
+  setPostScheduledAt: (value: string) => void
+  postSeriesName: string
+  setPostSeriesName: (value: string) => void
+  postSeriesOrder: number | null
+  setPostSeriesOrder: (value: number | null) => void
+  postCanonicalUrl: string
+  setPostCanonicalUrl: (value: string) => void
+  seriesCatalog: string[]
+  adminTempDrafts: ApiPostDto[]
+  isTempDraftsLoading: boolean
+  isTempDraftDrawerOpen: boolean
+  handleOpenTempDraftDrawer: () => void
+  handleCloseTempDraftDrawer: () => void
+  handleSelectTempDraft: (draftId: string | number) => Promise<void>
+  handleCreateNewTempDraft: () => Promise<void>
+  handleDeleteAdminTempDraft: (draftId: string | number) => Promise<void>
   removeTagFromPost: (tag: string) => void
   result: string
   serverBaselineEditorFingerprintRef: { current: string }

@@ -1,5 +1,6 @@
 export type { ApiPostWithContentDto, ExplorePostsPage, ExplorePostsParams } from "./posts/PostApiDtos"
 export type { AdjacentPostsResult } from "./posts/PostApiRequests"
+export type { PublicPostSeriesResponse, PublicSeriesPostItem } from "./posts/PostApiSeriesRequests"
 export { invalidatePublicPostReadCaches } from "./posts/PostApiCache"
 export { mapPostDetail } from "./posts/PostApiMappers"
 export {

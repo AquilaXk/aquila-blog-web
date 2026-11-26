@@ -122,9 +122,8 @@ const computeBlockMenuFromRects = (
   contentRect: DOMRect | null
 ): { top: number; left: number } | null => {
   if (!isBlockMenuOpen || !canShowGutterPlus || gutterTop === null || !containerRect) return null
-  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280
-  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800
-  const menuHeight = 432
+  const vp = readVisualViewportBounds()
+  const menuHeight = Math.min(432, Math.max(200, vp.height - 24))
   const rawBelowTop = Math.round(
     Math.max((lineCoords?.bottom ?? 0) + 6, containerRect.top + gutterTop + 26)
   )
@@ -135,11 +134,11 @@ const computeBlockMenuFromRects = (
     )
   )
   const top =
-    rawBelowTop + menuHeight > viewportHeight - 12 && rawAboveTop >= 12
+    rawBelowTop + menuHeight > vp.bottom - 12 && rawAboveTop >= vp.offsetTop + 12
       ? rawAboveTop
-      : Math.max(12, Math.min(rawBelowTop, viewportHeight - menuHeight - 12))
+      : Math.max(vp.offsetTop + 12, Math.min(rawBelowTop, vp.bottom - menuHeight - 12))
   const leftAnchor = contentRect ? contentRect.left : containerRect.left
-  const left = Math.max(12, Math.min(Math.round(leftAnchor + 10), viewportWidth - 232))
+  const left = Math.max(vp.offsetLeft + 12, Math.min(Math.round(leftAnchor + 10), vp.right - 236))
   return { top, left }
 }
 

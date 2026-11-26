@@ -13,6 +13,7 @@ import { CONFIG } from "site.config"
 import usePostQuery from "src/hooks/usePostQuery"
 import { BodySection, StyledWrapper } from "./PostDetail.styles"
 import type { RelatedPostsSectionProps } from "./PostDetailRelatedSection"
+import type { PostDetailSeriesLookupCardProps } from "./PostDetailSeriesCard"
 import {
   buildInitialTocFromMarkdown,
   collectTocFromArticle,
@@ -36,7 +37,8 @@ import {
   measureHybridRail,
   resolveRailTopOffset,
 } from "./PostDetailRailModel"
-import { PostLayoutSidebar, type MobileSummaryActionsProps } from "./PostDetailActionSections"
+import type { PostLayoutSidebarProps } from "./PostDetailDesktopRails"
+import type { MobileSummaryActionsProps } from "./PostDetailActionSections"
 import type { PostDetailNavigationChromeProps } from "./PostDetailNavigationChrome"
 import { usePostDetailEngagementActions } from "./usePostDetailEngagementActions"
 import { usePostDetailRelatedPosts } from "./usePostDetailRelatedPosts"
@@ -71,12 +73,21 @@ const RelatedPostsSection = dynamic<RelatedPostsSectionProps>(
 
 const PostDetailMobileToc = dynamic(() => import("./PostDetailMobileToc"))
 
+const PostLayoutSidebar = dynamic<PostLayoutSidebarProps>(() =>
+  import("./PostDetailDesktopRails").then((mod) => mod.PostLayoutSidebar)
+)
+
 const MobileSummaryActions = dynamic<MobileSummaryActionsProps>(() =>
   import("./PostDetailActionSections").then((mod) => mod.MobileSummaryActions)
 )
 
 const PostDetailNavigationChrome = dynamic<PostDetailNavigationChromeProps>(
   () => import("./PostDetailNavigationChrome").then((mod) => mod.PostDetailNavigationChrome)
+)
+
+const PostDetailSeriesLookupCard = dynamic<PostDetailSeriesLookupCardProps>(
+  () => import("./PostDetailSeriesCard").then((mod) => mod.PostDetailSeriesLookupCard),
+  { ssr: false }
 )
 
 export const RAIL_UI_DETAILED_TOC = 1
@@ -542,6 +553,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ initialInternalLinkTargets }) =
               />
             </RecoverableSurfaceBoundary>
           </BodySection>
+          {isPostType && data?.seriesName && data?.listed !== false ? (
+            <PostDetailSeriesLookupCard
+              seriesName={data.seriesName}
+              postId={String(postId)}
+            />
+          ) : null}
           {isPostType && <div ref={relatedPrefetchTriggerRef} className="relatedPrefetchTrigger" aria-hidden="true" />}
           {isPostType && shouldFetchRelated ? (
             <RelatedPostsSection

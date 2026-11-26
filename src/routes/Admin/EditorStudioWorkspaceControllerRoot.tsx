@@ -17,6 +17,7 @@ import { useEditorStudioThumbnailControls } from "./useEditorStudioThumbnailCont
 import { useEditorStudioThumbnailPreview } from "./useEditorStudioThumbnailPreview"
 import { useEditorStudioMetaCatalog } from "./useEditorStudioMetaCatalog"
 import { useEditorStudioPublishModalFlow } from "./useEditorStudioPublishModalFlow"
+import { useEditorStudioPublishingMetadata } from "./useEditorStudioPublishingMetadata"
 import { useEditorStudioServerTempDraftAutosave } from "./useEditorStudioServerTempDraftAutosave"
 import {
   requestToggleEditorViewMode,
@@ -78,6 +79,16 @@ export const EditorStudioWorkspaceController = ({
   const [postCategory, setPostCategory] = useState("")
   const [tagDraft, setTagDraft] = useState("")
   const [postVisibility, setPostVisibility] = useState<PostVisibility>("PUBLIC_LISTED")
+  const {
+    postScheduledAt, setPostScheduledAt, postSeriesName, setPostSeriesName,
+    postSeriesOrder, setPostSeriesOrder, postCanonicalUrl, setPostCanonicalUrl,
+    seriesCatalog, refreshAdminSeriesCatalog, adminTempDrafts, isTempDraftsLoading,
+    isTempDraftDrawerOpen, handleOpenTempDraftDrawer, handleCloseTempDraftDrawer,
+    handleSelectTempDraft, handleCreateNewTempDraft, handleDeleteAdminTempDraft,
+  } = useEditorStudioPublishingMetadata({
+    router, postId, toEditorPostRoute, editorNewRoutePath: EDITOR_NEW_ROUTE_PATH,
+    isAuthenticatedAdmin: Boolean(sessionMember),
+  })
   const [publishNotice, setPublishNotice] = useState<NoticeState>({
     tone: "idle",
     text: "",
@@ -239,6 +250,7 @@ export const EditorStudioWorkspaceController = ({
     postTags,
     postCategory,
     postVisibility,
+    postScheduledAt, postSeriesName, postSeriesOrder, postCanonicalUrl,
     editorMode,
     setEditorMode,
     setIsTempDraftMode,
@@ -257,6 +269,7 @@ export const EditorStudioWorkspaceController = ({
     setPostTags,
     setPostCategory,
     setPostVisibility,
+    setPostScheduledAt, setPostSeriesName, setPostSeriesOrder, setPostCanonicalUrl,
     setLocalDraftSavedAt,
     setLoadingKey,
     setResult,
@@ -427,6 +440,7 @@ export const EditorStudioWorkspaceController = ({
     postThumbnailFocusY,
     postThumbnailZoom,
     postVisibility,
+    postScheduledAt, postSeriesName, postSeriesOrder, postCanonicalUrl,
     effectiveThumbnailUrl,
     loadingKey,
     getCurrentPostContent,
@@ -484,14 +498,20 @@ export const EditorStudioWorkspaceController = ({
     isPublishModalOpen,
     onOpenPublishModal: () => setIsPublishModalOpen(true),
     onTogglePreviewMode: requestToggleEditorViewMode,
+    postScheduledAt, postSeriesName, postSeriesOrder, postCanonicalUrl,
   })
 
   useEditorStudioServerTempDraftAutosave({
     isTempDraftMode, editorMode, postId, loadingKey, postTitle, postContent, postSummary,
     postSummarySource, summaryIntent, postThumbnailUrl, postThumbnailFocusX,
     postThumbnailFocusY, postThumbnailZoom, postTags, postCategory, postVisibility,
+    postScheduledAt, postSeriesName, postSeriesOrder, postCanonicalUrl,
     serverBaselineEditorFingerprintRef, onSaveServerTempDraft: handleSaveServerTempDraft,
   })
+
+  useEffect(() => {
+    if (sessionMember && postVersion !== null) void refreshAdminSeriesCatalog()
+  }, [postVersion, refreshAdminSeriesCatalog, sessionMember])
 
   useEffect(() => {
     clearLastSaveError()
@@ -548,6 +568,10 @@ export const EditorStudioWorkspaceController = ({
         localDraftCandidates, localDraftSavedAt, localDraftSource, openPublishModal, openThumbnailFileInput,
         postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
         postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility,
+        postScheduledAt, setPostScheduledAt, postSeriesName, setPostSeriesName,
+        postSeriesOrder, setPostSeriesOrder, postCanonicalUrl, setPostCanonicalUrl, seriesCatalog,
+        adminTempDrafts, isTempDraftsLoading, isTempDraftDrawerOpen, handleOpenTempDraftDrawer,
+        handleCloseTempDraftDrawer, handleSelectTempDraft, handleCreateNewTempDraft, handleDeleteAdminTempDraft,
         publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef, previewThumbTransformRef,
         resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, saveLocalDraft, selectLocalDraftCandidate,
         restoredLocalDraft, result, safePreviewThumbnail, serverBaselineEditorFingerprintRef, sessionMember,

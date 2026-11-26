@@ -22,6 +22,7 @@ import {
 } from "./useEditorStudioWorkspaceControllerRuntime"
 import { EditorStudioThumbnailEditorPanel, EditorStudioThumbnailMetaPanel } from "./EditorStudioThumbnailPanels"
 import { EditorStudioPublishModal } from "./EditorStudioPublishModal"
+import { EditorStudioPublishMetadataSection } from "./EditorStudioPublishMetadataSection"
 import { EditorStudioDedicatedEditorLoadingState, EditorStudioDedicatedEditorSurface } from "./EditorStudioDedicatedEditorSurface"
 import {
   countMarkdownLinkWarnings,
@@ -72,7 +73,11 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     loadingKey, localDraftCandidate, localDraftCandidates, localDraftSavedAt, localDraftSource, openPublishModal,
     openThumbnailFileInput, postCategory, postContent, postId, postSummary, postSummarySource, summaryIntent,
     postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVersion,
-    postVisibility, publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
+    postVisibility, postScheduledAt, setPostScheduledAt, postSeriesName, setPostSeriesName,
+    postSeriesOrder, setPostSeriesOrder, postCanonicalUrl, setPostCanonicalUrl, seriesCatalog,
+    adminTempDrafts, isTempDraftsLoading, isTempDraftDrawerOpen, handleOpenTempDraftDrawer,
+    handleCloseTempDraftDrawer, handleSelectTempDraft, handleCreateNewTempDraft, handleDeleteAdminTempDraft,
+    publishActionType, publishModalNotice, publishNotice, previewThumbFrameRef,
     previewThumbTransformRef, resetThumbnailToAutoMode, removeTagFromPost, restoreLocalDraft, saveLocalDraft,
     selectLocalDraftCandidate, restoredLocalDraft, safePreviewThumbnail, serverBaselineEditorFingerprintRef,
     sessionMember, setIsMobileMetaEditorOpen, setIsMobileThumbnailEditorOpen, setIsPreviewThumbnailError,
@@ -98,6 +103,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         tags: [],
         category: "",
         visibility: "PUBLIC_LISTED",
+        scheduledAt: "",
+        seriesName: "",
+        seriesOrder: null,
+        canonicalUrl: "",
       }),
     []
   )
@@ -116,10 +125,18 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         tags: postTags,
         category: postCategory,
         visibility: postVisibility,
+        scheduledAt: postScheduledAt,
+        seriesName: postSeriesName,
+        seriesOrder: postSeriesOrder,
+        canonicalUrl: postCanonicalUrl,
       }),
     [
+      postCanonicalUrl,
       postCategory,
       postContent,
+      postScheduledAt,
+      postSeriesName,
+      postSeriesOrder,
       postSummary,
       postSummarySource,
       summaryIntent,
@@ -211,6 +228,10 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         tags: postTags,
         category: postCategory,
         visibility: postVisibility,
+        scheduledAt: postScheduledAt,
+        seriesName: postSeriesName,
+        seriesOrder: postSeriesOrder,
+        canonicalUrl: postCanonicalUrl,
       }),
       serverBaselineFingerprint: serverBaselineEditorFingerprintRef.current,
       localDraftFingerprint: lastLocalDraftFingerprintRef.current,
@@ -224,7 +245,11 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
     isEditorSaving,
     lastLocalDraftFingerprintRef,
     localDraftSavedAt,
+    postCanonicalUrl,
     postCategory,
+    postScheduledAt,
+    postSeriesName,
+    postSeriesOrder,
     postSummary,
     postSummarySource,
     summaryIntent,
@@ -260,10 +285,17 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
   })
   const {
     publishActionTitle,
-    publishActionButtonText,
+    publishActionButtonText: basePublishActionButtonText,
     publishActionButtonDisabled,
     publishActionTriggerDisabled,
   } = publishActionViewModel
+  const isScheduledSubmitReady = Boolean(postScheduledAt.trim()) && postVisibility !== "PRIVATE"
+  const isSubmittingWriteAction =
+    loadingKey === "writePost" || loadingKey === "modifyPost" || loadingKey === "publishTempPost"
+  const publishActionButtonText =
+    isScheduledSubmitReady && !isSubmittingWriteAction
+      ? adminT(editorMode === "edit" && !isTempDraftMode ? "editorActionUpdateSchedule" : "editorActionSchedule", language)
+      : basePublishActionButtonText
   const shouldShowPublishModalNotice =
     publishModalNotice.tone !== "idle" && publishModalNotice.text.trim().length > 0
   const shouldShowPublishNotice =
@@ -480,9 +512,27 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
         onOpenThumbnailFileInput={openThumbnailFileInput}
         onResetThumbnailToAutoMode={resetThumbnailToAutoMode}
         managedPostId={managedRevisionPostId}
+        postId={postId}
         postVersion={postVersion}
         isTempDraftMode={isTempDraftMode}
         onRevisionRestored={handleApplyRestoredRevision}
+        postScheduledAt={postScheduledAt}
+        onPostScheduledAtChange={setPostScheduledAt}
+        postSeriesName={postSeriesName}
+        onPostSeriesNameChange={setPostSeriesName}
+        postSeriesOrder={postSeriesOrder}
+        onPostSeriesOrderChange={setPostSeriesOrder}
+        postCanonicalUrl={postCanonicalUrl}
+        onPostCanonicalUrlChange={setPostCanonicalUrl}
+        seriesCatalog={seriesCatalog}
+        adminTempDrafts={adminTempDrafts}
+        isTempDraftsLoading={isTempDraftsLoading}
+        isTempDraftDrawerOpen={isTempDraftDrawerOpen}
+        onOpenTempDraftDrawer={handleOpenTempDraftDrawer}
+        onCloseTempDraftDrawer={handleCloseTempDraftDrawer}
+        onCreateNewTempDraft={handleCreateNewTempDraft}
+        onSelectTempDraft={handleSelectTempDraft}
+        onDeleteTempDraft={handleDeleteAdminTempDraft}
         publishModal={
           isPublishModalOpen ? (
             <EditorStudioPublishModal
@@ -500,6 +550,20 @@ export const EditorStudioWorkspaceControllerRootView = ({ props }: EditorStudioW
               postId={postId}
               readinessSummary={publishReadinessSummary}
               previewMetaEditorPanel={previewMetaEditorPanel}
+              publishingMetadataSection={
+                <EditorStudioPublishMetadataSection
+                  postVisibility={postVisibility}
+                  postScheduledAt={postScheduledAt}
+                  postSeriesName={postSeriesName}
+                  postSeriesOrder={postSeriesOrder}
+                  postCanonicalUrl={postCanonicalUrl}
+                  seriesCatalog={seriesCatalog}
+                  onScheduledAtChange={setPostScheduledAt}
+                  onSeriesNameChange={setPostSeriesName}
+                  onSeriesOrderChange={setPostSeriesOrder}
+                  onCanonicalUrlChange={setPostCanonicalUrl}
+                />
+              }
               publishActionButtonDisabled={publishActionButtonDisabled}
               publishActionButtonText={publishActionButtonText}
               publishActionTitle={publishActionTitle}

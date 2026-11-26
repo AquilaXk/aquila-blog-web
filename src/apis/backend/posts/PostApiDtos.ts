@@ -12,7 +12,20 @@ type PostWithContentSummaryFields = Pick<GeneratedPostWithContentDto, "summary" 
 
 export type ApiEditorPostDto = Pick<
   GeneratedPostWithContentDto,
-  "id" | "title" | "content" | "contentHtml" | "version" | "published" | "listed" | "tempDraft" | "summary" | "summarySource"
+  | "id"
+  | "title"
+  | "content"
+  | "contentHtml"
+  | "version"
+  | "published"
+  | "listed"
+  | "tempDraft"
+  | "summary"
+  | "summarySource"
+  | "scheduledAt"
+  | "seriesName"
+  | "seriesOrder"
+  | "canonicalUrl"
 >
 export type ApiPostWriteRequest = GeneratedPostWriteRequest
 export type ApiPostModifyRequest = GeneratedPostModifyRequest

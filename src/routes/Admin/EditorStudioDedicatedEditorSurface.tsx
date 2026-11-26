@@ -91,6 +91,8 @@ import {
   InlineExcerptInput,
 } from "./EditorStudioEditorialStyles"
 import { EditorStudioFeatureImageBar } from "./EditorStudioFeatureImageBar"
+import { EditorStudioTempDraftDrawer } from "./EditorStudioTempDraftDrawer"
+import { toLocalDateTimeInputValue } from "./useEditorStudioPublishingMetadata"
 import {
   readStoredDesktopSidebarMask,
   useAutosizeTextarea,
@@ -189,7 +191,11 @@ export const EditorStudioDedicatedEditorSurface = ({
   selectedLocalDraftCandidateKey, onSelectLocalDraftCandidate, onDiscardLocalDraftCandidate,
   onDismissLocalDraftRestoreSuggestion, onClearLocalDraft, publishModal, onUploadPostImage, onUploadPostAttachment, onInsertMarkdownSnippet,
   postThumbnailUrl, safePreviewThumbnail, isThumbnailUploading, isThumbnailUploadDisabled, onOpenThumbnailFileInput, onResetThumbnailToAutoMode,
-  managedPostId = null, postVersion = null, isTempDraftMode = false, onRevisionRestored,
+  managedPostId = null, postId = "", postVersion = null, isTempDraftMode = false, onRevisionRestored,
+  postScheduledAt = "", onPostScheduledAtChange, postSeriesName = "", onPostSeriesNameChange,
+  postSeriesOrder = null, onPostSeriesOrderChange, postCanonicalUrl = "", onPostCanonicalUrlChange,
+  seriesCatalog = [], adminTempDrafts = [], isTempDraftsLoading = false, isTempDraftDrawerOpen = false,
+  onOpenTempDraftDrawer, onCloseTempDraftDrawer, onCreateNewTempDraft, onSelectTempDraft, onDeleteTempDraft,
 }: EditorStudioDedicatedEditorSurfaceProps) => {
   const { language } = useLanguage()
   const isEn = language === "en"
@@ -366,6 +372,11 @@ export const EditorStudioDedicatedEditorSurface = ({
             </EditorStudioSaveState>
           ) : null}
           <EditorVisibilityMonoPill>{visibilityShortLabel}</EditorVisibilityMonoPill>
+          {postScheduledAt.trim() && postVisibility !== "PRIVATE" ? (
+            <EditorHeaderMetaPill data-testid="editor-scheduled-meta-pill">
+              {adminT("editorScheduleBadgePrefix", language)} · {toLocalDateTimeInputValue(postScheduledAt).replace("T", " ")}
+            </EditorHeaderMetaPill>
+          ) : null}
         </EditorWritingChromeDim>
 
         <EditorWritingChromeDim data-writing-focus={writingFocus}>
@@ -384,6 +395,11 @@ export const EditorStudioDedicatedEditorSurface = ({
               </EditorToggleIconWrap>
               <span>{isZenMode ? adminT("editorZenActiveLabel", language) : isEn ? adminT("editorZenLabel", language) : "집중 모드"}</span>
             </EditorSidebarToggleButton>
+            {onOpenTempDraftDrawer ? (
+              <SecondaryButton type="button" data-testid="editor-temp-drafts-button" onClick={onOpenTempDraftDrawer}>
+                <span>{adminT("editorTempDraftsButton", language)}</span>
+              </SecondaryButton>
+            ) : null}
             <EditorSidebarToggleButton
               type="button"
               data-testid="editor-inspector-toggle"
@@ -558,10 +574,19 @@ export const EditorStudioDedicatedEditorSurface = ({
           onUploadPostImage, onUploadPostAttachment, onInsertMarkdownSnippet,
           managedPostId, postVersion, actionsDisabled: isLocalDraftRestoreSuggestionActionsDisabled,
           onRevisionRestored, currentTitle: postTitle, currentTags: postTags, currentContent: postContent,
+          postScheduledAt, onPostScheduledAtChange, postSeriesName, onPostSeriesNameChange,
+          postSeriesOrder, onPostSeriesOrderChange, postCanonicalUrl, onPostCanonicalUrlChange, seriesCatalog,
         })}
       </EditorStudioFrame>
 
       {isGuideOpen ? <EditorStudioGuideModal onClose={() => setIsGuideOpen(false)} /> : null}
+      {onCloseTempDraftDrawer && onCreateNewTempDraft && onSelectTempDraft && onDeleteTempDraft ? (
+        <EditorStudioTempDraftDrawer
+          open={isTempDraftDrawerOpen} loading={isTempDraftsLoading} currentPostId={postId || (managedPostId ? String(managedPostId) : "")}
+          drafts={adminTempDrafts} onClose={onCloseTempDraftDrawer} onCreateNew={onCreateNewTempDraft}
+          onSelectDraft={onSelectTempDraft} onDeleteDraft={onDeleteTempDraft}
+        />
+      ) : null}
 
       {publishModal}
     </EditorStudioRoot>

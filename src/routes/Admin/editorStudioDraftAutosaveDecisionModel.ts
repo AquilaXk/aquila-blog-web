@@ -125,6 +125,10 @@ export const computeStoredDraftFingerprint = (
     | "tags"
     | "category"
     | "visibility"
+    | "scheduledAt"
+    | "seriesName"
+    | "seriesOrder"
+    | "canonicalUrl"
   >,
   buildLocalDraftFingerprint: (payload: LocalDraftFingerprintPayload) => string,
   dedupeStrings: (items: string[]) => string[],
@@ -143,6 +147,10 @@ export const computeStoredDraftFingerprint = (
     tags: dedupeStrings(draft.tags),
     category: draft.category.trim() ? normalizeCategoryValue(draft.category) : "",
     visibility: draft.visibility,
+    scheduledAt: draft.scheduledAt ?? "",
+    seriesName: draft.seriesName ?? "",
+    seriesOrder: draft.seriesOrder ?? null,
+    canonicalUrl: draft.canonicalUrl ?? "",
   })
 
 export const selectPreferredLocalDraftCandidate = (

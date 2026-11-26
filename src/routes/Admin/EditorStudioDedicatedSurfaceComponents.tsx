@@ -36,8 +36,10 @@ import {
   formatCategoryDraftInputValue,
   isMobileEditorViewport,
 } from "./editorStudioDedicatedSurfaceModel"
+import type { ApiPostDto } from "src/apis/backend/posts/PostApiDtos"
 import { PREVIEW_SUMMARY_MAX_LENGTH } from "./editorStudioMetaModel"
 import { getPublishVisibilityOptions } from "./EditorStudioWorkspaceControllerRootModel"
+import { EditorStudioInspectorPublishingFields } from "./EditorStudioInspectorPublishingFields"
 import type { PostVisibility } from "./editorStudioState"
 import type { WritingFocus } from "./editorStudioWritingFocus"
 
@@ -103,9 +105,27 @@ export type EditorStudioDedicatedEditorSurfaceProps = {
   onOpenThumbnailFileInput?: () => void
   onResetThumbnailToAutoMode?: () => void
   managedPostId?: number | null
+  postId?: string
   postVersion?: number | null
   isTempDraftMode?: boolean
   onRevisionRestored?: (restoredPost?: unknown) => Promise<void> | void
+  postScheduledAt?: string
+  onPostScheduledAtChange?: (value: string) => void
+  postSeriesName?: string
+  onPostSeriesNameChange?: (value: string) => void
+  postSeriesOrder?: number | null
+  onPostSeriesOrderChange?: (value: number | null) => void
+  postCanonicalUrl?: string
+  onPostCanonicalUrlChange?: (value: string) => void
+  seriesCatalog?: string[]
+  adminTempDrafts?: ApiPostDto[]
+  isTempDraftsLoading?: boolean
+  isTempDraftDrawerOpen?: boolean
+  onOpenTempDraftDrawer?: () => void
+  onCloseTempDraftDrawer?: () => void
+  onCreateNewTempDraft?: () => Promise<void>
+  onSelectTempDraft?: (draftId: string | number) => Promise<void>
+  onDeleteTempDraft?: (draftId: string | number) => Promise<void>
 }
 
 export const activateEditorOutlineItem = (
@@ -332,6 +352,15 @@ export const renderEditorInspectorPanel = ({
   currentTitle = "",
   currentTags = [],
   currentContent = "",
+  postScheduledAt = "",
+  onPostScheduledAtChange,
+  postSeriesName = "",
+  onPostSeriesNameChange,
+  postSeriesOrder = null,
+  onPostSeriesOrderChange,
+  postCanonicalUrl = "",
+  onPostCanonicalUrlChange,
+  seriesCatalog = [],
 }: {
   language?: SiteLanguage
   isInspectorOpen: boolean
@@ -361,6 +390,15 @@ export const renderEditorInspectorPanel = ({
   currentTitle?: string
   currentTags?: string[]
   currentContent?: string
+  postScheduledAt?: string
+  onPostScheduledAtChange?: (value: string) => void
+  postSeriesName?: string
+  onPostSeriesNameChange?: (value: string) => void
+  postSeriesOrder?: number | null
+  onPostSeriesOrderChange?: (value: number | null) => void
+  postCanonicalUrl?: string
+  onPostCanonicalUrlChange?: (value: string) => void
+  seriesCatalog?: string[]
 }) => {
   if (!isInspectorOpen) return null
   const visibilityOptions = getPublishVisibilityOptions(language)
@@ -480,6 +518,20 @@ export const renderEditorInspectorPanel = ({
           currentTags={currentTags}
           currentContent={currentContent}
         />
+        {onPostScheduledAtChange && onPostSeriesNameChange && onPostSeriesOrderChange && onPostCanonicalUrlChange ? (
+          <EditorStudioInspectorPublishingFields
+            postVisibility={postVisibility}
+            postScheduledAt={postScheduledAt}
+            postSeriesName={postSeriesName}
+            postSeriesOrder={postSeriesOrder}
+            postCanonicalUrl={postCanonicalUrl}
+            seriesCatalog={seriesCatalog}
+            onScheduledAtChange={onPostScheduledAtChange}
+            onSeriesNameChange={onPostSeriesNameChange}
+            onSeriesOrderChange={onPostSeriesOrderChange}
+            onCanonicalUrlChange={onPostCanonicalUrlChange}
+          />
+        ) : null}
         {linkWarningCount > 0 ? <p role="alert">{linkWarningMessage}</p> : null}
         </EditorInspector>
       )}

@@ -68,6 +68,7 @@ type EditorStudioPublishModalProps = {
     prePublishWarnings?: readonly MarkdownPrePublishWarning[]
   }
   previewMetaEditorPanel: ReactNode
+  publishingMetadataSection?: ReactNode
   publishActionButtonDisabled: boolean
   publishActionButtonText: string
   publishActionTitle: string
@@ -99,6 +100,7 @@ export const EditorStudioPublishModal = ({
   postId = "",
   readinessSummary,
   previewMetaEditorPanel,
+  publishingMetadataSection = null,
   publishActionButtonDisabled,
   publishActionButtonText,
   publishActionTitle,
@@ -184,6 +186,8 @@ export const EditorStudioPublishModal = ({
               onPostVisibilityChange={onPostVisibilityChange}
             />
           </PublishOverviewGrid>
+
+          {publishingMetadataSection}
 
           <EditorStudioPublishSerpPreview
             title={postTitle}

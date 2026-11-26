@@ -177,5 +177,11 @@ const EDITOR_TRANSLATIONS = {
 
 export type EditorI18nKey = keyof (typeof EDITOR_TRANSLATIONS)["ko"]
 
-export const editorT = (key: EditorI18nKey, language: SiteLanguage = "ko"): string =>
-  EDITOR_TRANSLATIONS[language]?.[key] ?? EDITOR_TRANSLATIONS.ko[key]
+export const editorT = (
+  key: EditorI18nKey,
+  language: SiteLanguage = "ko",
+  activeModLabel: string = modShortcutLabel
+): string => {
+  const raw = EDITOR_TRANSLATIONS[language]?.[key] ?? EDITOR_TRANSLATIONS.ko[key]
+  return activeModLabel === modShortcutLabel ? raw : raw.replaceAll(modShortcutLabel, activeModLabel)
+}

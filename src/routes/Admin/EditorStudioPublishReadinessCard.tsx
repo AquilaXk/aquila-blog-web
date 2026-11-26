@@ -164,6 +164,11 @@ const formatPrePublishWarningText = (warning: MarkdownPrePublishWarning, isEn: b
       ? `Draft placeholder marker "${warning.token}" at line ${warning.line}`
       : `미완성 표식 "${warning.token}"가 남아 있습니다 (${warning.line}번 줄)`
   }
+  if (warning.kind === "content-too-long") {
+    return isEn
+      ? `Post body (${warning.length.toLocaleString()} chars) exceeds limit of ${warning.maxLength.toLocaleString()} chars`
+      : `본문 길이(${warning.length.toLocaleString()}자)가 최대 ${warning.maxLength.toLocaleString()}자를 초과했습니다`
+  }
   return isEn
     ? `${warning.count} body H1 heading (line ${warning.firstLine}) — H2–H4 recommended below post title`
     : `본문 H1 제목 ${warning.count}개 (${warning.firstLine}번 줄) — 글 제목 아래에서는 H2~H4 권장`
@@ -256,7 +261,9 @@ export const EditorStudioPublishReadinessCard = ({
       {prePublishWarnings.length > 0 ? (
         <ReadinessWarningsList data-testid="editor-publish-warnings" role="status">
           {prePublishWarnings.map((warning) => (
-            <ReadinessWarningItem key={`${warning.kind}-${"line" in warning ? warning.line : warning.firstLine}`}>
+            <ReadinessWarningItem
+              key={`${warning.kind}-${"line" in warning ? warning.line : "firstLine" in warning ? warning.firstLine : warning.length}`}
+            >
               {formatPrePublishWarningText(warning, isEn)}
             </ReadinessWarningItem>
           ))}

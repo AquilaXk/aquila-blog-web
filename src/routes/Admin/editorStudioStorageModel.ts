@@ -210,6 +210,13 @@ const parseLocalDraftPayload = (
         : [],
       category: typeof parsed.category === "string" && parsed.category.trim() ? normalizeCategoryValue(parsed.category) : "",
       visibility: isValidVisibility ? visibility : "PUBLIC_LISTED",
+      scheduledAt: typeof parsed.scheduledAt === "string" ? parsed.scheduledAt : "",
+      seriesName: typeof parsed.seriesName === "string" ? parsed.seriesName : "",
+      seriesOrder:
+        typeof parsed.seriesOrder === "number" && Number.isInteger(parsed.seriesOrder) && parsed.seriesOrder >= 1
+          ? parsed.seriesOrder
+          : null,
+      canonicalUrl: typeof parsed.canonicalUrl === "string" ? parsed.canonicalUrl : "",
       savedAt,
       source,
       postVersion,

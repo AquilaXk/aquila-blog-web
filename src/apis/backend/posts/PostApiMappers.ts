@@ -239,6 +239,10 @@ export const mapPostDto = (post: ApiPostDto): TPost => {
     createdTime: postCreatedAt,
     modifiedTime: post.modifiedAt,
     fullWidth: false,
+    ...(typeof post.scheduledAt === "string" && post.scheduledAt ? { scheduledAt: post.scheduledAt } : {}),
+    ...(typeof post.seriesName === "string" && post.seriesName ? { seriesName: post.seriesName } : {}),
+    ...(typeof post.seriesOrder === "number" ? { seriesOrder: post.seriesOrder } : {}),
+    ...(typeof post.canonicalUrl === "string" && post.canonicalUrl ? { canonicalUrl: post.canonicalUrl } : {}),
   }
 }
 
@@ -283,6 +287,10 @@ export const mapPostDetail = async (
       category,
       published: post.published,
       listed: post.listed,
+      scheduledAt: post.scheduledAt ?? null,
+      seriesName: post.seriesName ?? null,
+      seriesOrder: post.seriesOrder ?? null,
+      canonicalUrl: post.canonicalUrl ?? null,
     }),
     ...(tags.length > 0 ? { tags } : {}),
     ...(category.length > 0 ? { category } : {}),

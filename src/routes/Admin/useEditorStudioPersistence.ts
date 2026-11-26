@@ -1,21 +1,11 @@
-import {
-  useCallback,
-  useRef,
-  useState,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-} from "react"
+import { useCallback, useRef, useState } from "react"
 import { captureLocalDraftCleanup } from "./editorStudioStorageModel"
 import { apiFetch } from "src/apis/backend/client"
 import { useLanguage } from "src/libs/language"
 import { adminT } from "./adminI18n"
 import { resolveEditorFailureRecovery, type EditorFailureRecovery } from "./editorFailureRecoveryModel"
 import { isTempDraftCandidate } from "./editorTempDraft"
-import {
-  resolveCreateWritePostId,
-  type LocalDraftBaselineReadySignal,
-} from "./useEditorStudioDraftLifecycleModel"
+import { resolveCreateWritePostId } from "./useEditorStudioDraftLifecycleModel"
 import { resolveCanonicalCategoryFromCatalog } from "./useEditorStudioMetaCatalog"
 import { extractPendingTagDraftValues } from "./useEditorStudioPublishModalFlow"
 import {
@@ -23,26 +13,25 @@ import {
   toCreateSummaryWriteFields,
   toModifySummaryWriteFields,
   type CanonicalSummaryState,
-  type SummaryIntent,
 } from "./EditorStudioWorkspaceControllerRootModel"
 import {
-  useEditorStudioPersistenceUploads,
   formatPostVisibilityLabel,
+  useEditorStudioPersistenceUploads,
 } from "./useEditorStudioPersistenceModel"
 import { resolvePostSaveRefresh } from "./editorPostSaveRefresh"
 import {
   armLocalDraftFingerprintBaseline,
+  buildPublishingMetadataPayload,
   executeServerTempDraftSave,
   isBrowserOnline,
+  resolveEffectivePublishingFlags,
+  validateEditorContentPreflight,
   type EditorFingerprintPayload,
-  type EditorMode,
   type PostWriteResult,
-  type PublishNotice,
-  type PublishTarget,
   type UseEditorStudioPersistenceParams,
 } from "./useEditorStudioPersistenceHelpers"
 
-import type { PostVisibility, RsData } from "src/types"
+import type { RsData } from "src/types"
 
 export const useEditorStudioPersistence = ({
   addTagsToPost, buildEditorStateFingerprint, commitPostCategory, composeEditorContent, customCategoryCatalog,
@@ -52,7 +41,8 @@ export const useEditorStudioPersistence = ({
   lastWriteIdempotencyKeyRef, loadingKey, normalizeSafeImageUrl, postCategory,
   getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent, postTags,
   postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle,
-  postVersion, postVisibility, pretty, refreshPublicPostReadViews, saveLocalDraft,
+  postVersion, postVisibility, postScheduledAt = "", postSeriesName = "", postSeriesOrder = null,
+  postCanonicalUrl = "", pretty, refreshPublicPostReadViews, saveLocalDraft,
   serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, cancelPendingAutosave, setEditorMode,
   setIsPreviewThumbnailError, setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
   setPostCategory, setPostId, setPostThumbnailFocusX, setPostThumbnailFocusY,
@@ -109,16 +99,24 @@ export const useEditorStudioPersistence = ({
 
   const validateContentPreflight = useCallback(
     (currentPostContent: string): boolean => {
-      if (!postTitle.trim()) return reportValidationError(adminT("editorValidationTitleRequired", language))
-      if (!currentPostContent.trim()) return reportValidationError(adminT("editorValidationBodyRequired", language))
-      if (postThumbnailUrl.trim() && !normalizeSafeImageUrl(postThumbnailUrl)) {
-        return reportValidationError(adminT("editorUploadInvalidThumbUrl", language))
-      }
-      const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
-      if (placeholderIssue) return reportValidationError(placeholderIssue)
-      return true
+      const error = validateEditorContentPreflight({
+        postTitle,
+        currentPostContent,
+        postThumbnailUrl,
+        postCanonicalUrl,
+        postSeriesOrder,
+        postScheduledAt,
+        postVisibility,
+        language,
+        normalizeSafeImageUrl,
+        detectPublishPlaceholderIssue,
+      })
+      return error ? reportValidationError(error) : true
     },
-    [detectPublishPlaceholderIssue, language, normalizeSafeImageUrl, postThumbnailUrl, postTitle, reportValidationError]
+    [
+      detectPublishPlaceholderIssue, language, normalizeSafeImageUrl, postCanonicalUrl, postScheduledAt,
+      postSeriesOrder, postThumbnailUrl, postTitle, postVisibility, reportValidationError,
+    ]
   )
 
   const applyCanonicalWriteResponse = useCallback(
@@ -204,22 +202,41 @@ export const useEditorStudioPersistence = ({
       tags,
       category,
       visibility: postVisibility,
+      scheduledAt: postScheduledAt,
+      seriesName: postSeriesName,
+      seriesOrder: postSeriesOrder,
+      canonicalUrl: postCanonicalUrl,
     }),
-    [postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility]
+    [
+      postCanonicalUrl, postScheduledAt, postSeriesName, postSeriesOrder, postThumbnailFocusX,
+      postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
+    ]
   )
 
   const buildModifyPostRequestBody = useCallback(
-    (content: string, tags: string[], category: string) => ({
-      title: postTitle,
-      content: composeEditorContent(content, tags, {
-        category,
-        thumbnail: effectiveThumbnailUrl,
-      }),
-      ...toModifySummaryWriteFields(summaryIntent),
-      ...toFlags(postVisibility),
-      version: postVersion,
-    }),
-    [composeEditorContent, effectiveThumbnailUrl, postTitle, postVersion, postVisibility, summaryIntent, toFlags]
+    (content: string, tags: string[], category: string) => {
+      const metadataFields = buildPublishingMetadataPayload(
+        postScheduledAt,
+        postSeriesName,
+        postSeriesOrder,
+        postCanonicalUrl
+      )
+      return {
+        title: postTitle,
+        content: composeEditorContent(content, tags, {
+          category,
+          thumbnail: effectiveThumbnailUrl,
+        }),
+        ...toModifySummaryWriteFields(summaryIntent),
+        ...resolveEffectivePublishingFlags(postVisibility, Boolean(metadataFields.scheduledAt), toFlags),
+        ...metadataFields,
+        version: postVersion,
+      }
+    },
+    [
+      composeEditorContent, effectiveThumbnailUrl, postCanonicalUrl, postScheduledAt,
+      postSeriesName, postSeriesOrder, postTitle, postVersion, postVisibility, summaryIntent, toFlags,
+    ]
   )
 
   const handleWritePost = useCallback(async (): Promise<boolean> => {
@@ -240,11 +257,23 @@ export const useEditorStudioPersistence = ({
         thumbnail: effectiveThumbnailUrl,
       })
 
+      const metadataFields = buildPublishingMetadataPayload(
+        postScheduledAt,
+        postSeriesName,
+        postSeriesOrder,
+        postCanonicalUrl
+      )
+      const effectiveFlags = resolveEffectivePublishingFlags(
+        postVisibility,
+        Boolean(metadataFields.scheduledAt),
+        toFlags
+      )
       const summaryWriteFields = toCreateSummaryWriteFields(summaryIntent)
       const fingerprint = JSON.stringify({
         title: postTitle,
         content: contentWithMetadata,
         visibility: postVisibility,
+        ...metadataFields,
         ...summaryWriteFields,
       })
       if (lastWriteFingerprintRef.current !== fingerprint || !lastWriteIdempotencyKeyRef.current) {
@@ -261,7 +290,8 @@ export const useEditorStudioPersistence = ({
           title: postTitle,
           content: contentWithMetadata,
           ...summaryWriteFields,
-          ...toFlags(postVisibility),
+          ...effectiveFlags,
+          ...metadataFields,
         }),
       })
 
@@ -325,11 +355,12 @@ export const useEditorStudioPersistence = ({
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildSuccessfulWriteFingerprintPayload,
     composeEditorContent, dedupeStrings, editorMode, effectiveThumbnailUrl, generateIdempotencyKey,
     getCurrentPostContent, isEn, language, lastLocalDraftFingerprintRef, lastWriteFingerprintRef,
-    lastWriteIdempotencyKeyRef, postId, summaryIntent, postTitle, postVisibility, pretty,
-    refreshPublicPostReadViews, reportSaveFailure, reportValidationError, resolveAuthoringMetadataForWrite,
-    serverBaselineEditorFingerprintRef, signalLocalDraftBaselineReady, cancelPendingAutosave, setEditorMode,
-    setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
-    setPostId, setPostVersion, setPublishStatus, setResult, toFlags, validateContentPreflight,
+    lastWriteIdempotencyKeyRef, postCanonicalUrl, postId, postScheduledAt, postSeriesName,
+    postSeriesOrder, postTitle, postVisibility, pretty, refreshPublicPostReadViews, reportSaveFailure,
+    reportValidationError, resolveAuthoringMetadataForWrite, serverBaselineEditorFingerprintRef,
+    signalLocalDraftBaselineReady, cancelPendingAutosave, setEditorMode, setIsTempDraftMode,
+    setLoadingKey, setLocalDraftSavedAt, setPostId, setPostVersion, setPublishStatus, setResult,
+    summaryIntent, toFlags, validateContentPreflight,
   ])
 
   const handleModifyPost = useCallback(async (): Promise<boolean> => {
@@ -362,7 +393,11 @@ export const useEditorStudioPersistence = ({
         effectiveTags,
         effectiveCategory
       )
-      const modifiedFlags = toFlags(postVisibility)
+      const modifiedFlags = resolveEffectivePublishingFlags(
+        postVisibility,
+        Boolean(postScheduledAt.trim()),
+        toFlags
+      )
 
       setPostVersion(typeof response?.data?.version === "number" ? response.data.version : postVersion)
       setIsTempDraftMode(
@@ -403,8 +438,8 @@ export const useEditorStudioPersistence = ({
   }, [
     applyCanonicalWriteResponse, buildEditorStateFingerprint, buildModifyPostRequestBody,
     buildSuccessfulWriteFingerprintPayload, dedupeStrings, editorMode, getCurrentPostContent,
-    isEn, language, lastLocalDraftFingerprintRef, postId, postTitle, postVersion, postVisibility,
-    pretty, refreshPublicPostReadViews, reportSaveFailure, reportValidationError,
+    isEn, language, lastLocalDraftFingerprintRef, postId, postScheduledAt, postTitle, postVersion,
+    postVisibility, pretty, refreshPublicPostReadViews, reportSaveFailure, reportValidationError,
     resolveAuthoringMetadataForWrite, serverBaselineEditorFingerprintRef,
     signalLocalDraftBaselineReady, cancelPendingAutosave, setIsTempDraftMode, setLoadingKey,
     setLocalDraftSavedAt, setPostVersion, setPublishStatus, setResult, toFlags,
@@ -502,6 +537,7 @@ export const useEditorStudioPersistence = ({
         return await executeServerTempDraftSave({
           silent, isEn, normalizedPostId, postTitle, currentPostContent, composed, postVersion,
           effectiveTags, effectiveCategory, effectiveThumbnailUrl, postSummary, postSummarySource,
+          postScheduledAt, postSeriesName, postSeriesOrder, postCanonicalUrl,
           getCurrentPostContent, applyCanonicalWriteResponse, buildSuccessfulWriteFingerprintPayload,
           buildEditorStateFingerprint, dedupeStrings, serverBaselineEditorFingerprintRef,
           lastLocalDraftFingerprintRef, cancelPendingAutosave, signalLocalDraftBaselineReady,
@@ -516,7 +552,8 @@ export const useEditorStudioPersistence = ({
       applyCanonicalWriteResponse, buildEditorStateFingerprint, buildSuccessfulWriteFingerprintPayload,
       cancelPendingAutosave, composeEditorContent, customCategoryCatalog, dedupeStrings, editorMode,
       effectiveThumbnailUrl, getCurrentPostContent, isEn, lastLocalDraftFingerprintRef, loadingKey,
-      postCategory, postId, postSummary, postSummarySource, postTags, postTitle, postVersion,
+      postCanonicalUrl, postCategory, postId, postScheduledAt, postSeriesName, postSeriesOrder,
+      postSummary, postSummarySource, postTags, postTitle, postVersion,
       resolveAuthoringMetadataForWrite, saveLocalDraft, serverBaselineEditorFingerprintRef,
       setLoadingKey, setLocalDraftSavedAt, setPostVersion, setPublishStatus,
       signalLocalDraftBaselineReady,

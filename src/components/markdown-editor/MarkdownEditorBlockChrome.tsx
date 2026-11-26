@@ -6,7 +6,8 @@
  */
 import {
   useEffect, useLayoutEffect, useMemo, useRef, useState,
-  type KeyboardEvent as ReactKeyboardEvent, type RefObject,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
 } from "react"
 import styled from "@emotion/styled"
 import { focusVisibleRing } from "src/design-system/focusRing"
@@ -43,12 +44,17 @@ import {
   moveBlockMenuFocus,
 } from "./markdownEditorBlockChromeModel"
 import {
+  BlockDropIndicatorBar,
   BubbleActionButton,
   BubbleColorSwatchPopover,
   BubbleColorTriggerGlyph,
   BubbleDivider,
   ColorSwatchDot,
 } from "./MarkdownEditorBlockChrome.styles"
+import {
+  useBlockChromeViewportListeners,
+  useMarkdownEditorBlockDrag,
+} from "./markdownEditorBlockDragHelper"
 import { MarkdownEditorBlockMenuPopover } from "./MarkdownEditorBlockMenuPopover"
 import type { MarkdownEditorSurfaceMode } from "./markdownEditorLivePreview"
 import { isLivePreviewSurfaceMode } from "./markdownEditorLivePreview"
@@ -108,6 +114,8 @@ const GutterPlusButton = styled(GutterHandleButtonBase)`
 
 const GutterDragMenuButton = styled(GutterHandleButtonBase)`
   font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: -1px;
+  cursor: grab; touch-action: none; user-select: none;
+  &[data-dragging="true"] { cursor: grabbing; opacity: 1; }
 `
 
 export const MarkdownEditorBlockChrome = ({
@@ -136,6 +144,20 @@ export const MarkdownEditorBlockChrome = ({
   const gutterHandleRef = useRef<HTMLButtonElement | null>(null)
   const prevValueRef = useRef(value)
   const lastLinkNonceRef = useRef(linkPopoverTriggerNonce)
+  const liveRefs = useRef({
+    value,
+    selection,
+    isBlockMenuOpen,
+    resolvePosAtCoords,
+    resolveCoords,
+  })
+  liveRefs.current = {
+    value,
+    selection,
+    isBlockMenuOpen,
+    resolvePosAtCoords,
+    resolveCoords,
+  }
 
   useEffect(() => {
     setIsDismissed(false)
@@ -188,49 +210,6 @@ export const MarkdownEditorBlockChrome = ({
     }
   }, [activeCursorLink, disabled, isFindReplaceOpen, isSlashMenuOpen, linkPopoverTriggerNonce, mode, selection.from, selection.to])
 
-  useEffect(() => {
-    if (!isLivePreviewSurfaceMode(mode) || disabled) return
-    const container = containerRef.current
-    let rafId: number | null = null
-    const bumpLayout = () => {
-      if (rafId !== null) return
-      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-        rafId = window.requestAnimationFrame(() => {
-          rafId = null
-          setLayoutTick((prev) => prev + 1)
-        })
-      } else {
-        setLayoutTick((prev) => prev + 1)
-      }
-    }
-    const handleMouseMove = (event: MouseEvent) => {
-      setIsTypingDimmed(false)
-      if (!resolvePosAtCoords || isBlockMenuOpen || selection.from !== selection.to) return
-      const pos = resolvePosAtCoords({ x: event.clientX, y: event.clientY })
-      if (pos === null) return
-      const lineStart = pos > 0 ? value.lastIndexOf("\n", pos - 1) + 1 : 0
-      setHoveredLineStart((prev) => (prev === lineStart ? prev : lineStart))
-    }
-    const handleMouseLeave = () => {
-      setHoveredLineStart(null)
-    }
-    container?.addEventListener("scroll", bumpLayout, true)
-    container?.addEventListener("mousemove", handleMouseMove)
-    container?.addEventListener("mouseleave", handleMouseLeave)
-    window.addEventListener("resize", bumpLayout)
-    window.addEventListener("scroll", bumpLayout, true)
-    return () => {
-      if (rafId !== null && typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
-        window.cancelAnimationFrame(rafId)
-      }
-      container?.removeEventListener("scroll", bumpLayout, true)
-      container?.removeEventListener("mousemove", handleMouseMove)
-      container?.removeEventListener("mouseleave", handleMouseLeave)
-      window.removeEventListener("resize", bumpLayout)
-      window.removeEventListener("scroll", bumpLayout, true)
-    }
-  }, [containerRef, disabled, isBlockMenuOpen, mode, resolvePosAtCoords, selection.from, selection.to, value])
-
   const targetGutterPos = hoveredLineStart !== null ? hoveredLineStart : selection.from
   const targetLineState = useMemo(
     () =>
@@ -241,6 +220,37 @@ export const MarkdownEditorBlockChrome = ({
   )
   const effectiveGutterLineStart = targetLineState.activeLineStart
   const effectiveBlockKind = targetLineState.currentBlockKind
+  const closeBlockMenu = () => setIsBlockMenuOpen(false)
+  const {
+    dragPreview,
+    isDraggingBlock,
+    isDragActiveRef,
+    cancelBlockDrag,
+    consumeSuppressedClick,
+    onHandlePointerDown,
+    onHandlePointerMove,
+    onHandlePointerUp,
+    onHandlePointerCancel,
+  } = useMarkdownEditorBlockDrag({
+    containerRef,
+    disabled,
+    effectiveGutterLineStart,
+    value,
+    resolveCoords,
+    resolvePosAtCoords,
+    onCloseBlockMenu: closeBlockMenu,
+    onApplyPlan: onTriggerSlashCommand,
+  })
+  useBlockChromeViewportListeners({
+    containerRef,
+    disabled,
+    mode,
+    liveRefs,
+    isDragActiveRef,
+    setLayoutTick,
+    setHoveredLineStart,
+    setIsTypingDimmed,
+  })
 
   const selectedText = useMemo(
     () => (selection.from < selection.to && selection.to - selection.from <= 600 ? value.slice(selection.from, selection.to) : ""),
@@ -270,6 +280,7 @@ export const MarkdownEditorBlockChrome = ({
     }
     const handleKeyDownCapture = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (cancelBlockDrag()) return
         if (isColorPopoverOpen) {
           setIsColorPopoverOpen(false)
           return
@@ -288,7 +299,7 @@ export const MarkdownEditorBlockChrome = ({
       document.removeEventListener("mousedown", handleMouseDownCapture, true)
       window.removeEventListener("keydown", handleKeyDownCapture, true)
     }
-  }, [activeCursorLink, canShowBubble, isBlockMenuOpen, isColorPopoverOpen, isLinkPopoverOpen])
+  }, [activeCursorLink, canShowBubble, cancelBlockDrag, isBlockMenuOpen, isColorPopoverOpen, isLinkPopoverOpen])
 
   const canShowGutterPlus =
     isLivePreviewSurfaceMode(mode) && !disabled && !isSlashMenuOpen && selection.from === selection.to && !targetLineState.insideFence && targetGutterPos >= 0
@@ -447,12 +458,18 @@ export const MarkdownEditorBlockChrome = ({
             aria-haspopup="menu"
             aria-expanded={isBlockMenuOpen}
             data-block-kind={effectiveBlockKind}
+            data-dragging={isDraggingBlock ? "true" : undefined}
             data-testid="markdown-block-gutter-handle"
             $top={gutterTop}
             $left={gutterLeft + 25}
             $dimmed={gutterDimmed}
             onMouseDown={(event) => event.preventDefault()}
+            onPointerDown={onHandlePointerDown}
+            onPointerMove={onHandlePointerMove}
+            onPointerUp={onHandlePointerUp}
+            onPointerCancel={onHandlePointerCancel}
             onClick={() => {
+              if (consumeSuppressedClick()) return
               setIsTypingDimmed(false)
               if (!isBlockMenuOpen && hoveredLineStart !== null && hoveredLineStart !== activeLineStart) {
                 onSelectGutterLine?.(hoveredLineStart)
@@ -462,6 +479,13 @@ export const MarkdownEditorBlockChrome = ({
           >
             <EditorIconGripSixDots size={15} />
           </GutterDragMenuButton>
+          {isDraggingBlock && dragPreview ? (
+            <BlockDropIndicatorBar
+              data-testid="markdown-block-drop-indicator"
+              $top={dragPreview.indicatorTop}
+              $left={gutterLeft}
+            />
+          ) : null}
         </>
       ) : null}
       {isBlockMenuOpen && blockMenuPosition ? (

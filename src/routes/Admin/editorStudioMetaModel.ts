@@ -56,6 +56,10 @@ export type LocalDraftPayload = {
   tags: string[]
   category: string
   visibility: PostVisibility
+  scheduledAt?: string
+  seriesName?: string
+  seriesOrder?: number | null
+  canonicalUrl?: string
   savedAt: string
   source: LocalDraftSource
   postVersion?: number | null
@@ -81,6 +85,25 @@ const EDITOR_BODY_PLACEHOLDER = "내용을 입력하세요."
 const EDITOR_TOGGLE_TITLE_PLACEHOLDER = "토글 제목"
 export const PREVIEW_SUMMARY_MAX_LENGTH = 150
 export const PREVIEW_SUMMARY_MAX_CONTENT_LENGTH = 50_000
+export const POST_CONTENT_MAX_LENGTH = 500_000
+export const SERIES_NAME_MAX_LENGTH = 120
+export const CANONICAL_URL_MAX_LENGTH = 2048
+
+export const normalizeSafeCanonicalUrl = (raw: string): string => {
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed.length > CANONICAL_URL_MAX_LENGTH || /[\u0000-\u0020\u007f]/.test(trimmed)) {
+    return ""
+  }
+  try {
+    const parsed = new URL(trimmed)
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) {
+      return ""
+    }
+    return parsed.toString()
+  } catch {
+    return ""
+  }
+}
 
 const normalizeMetaScalar = (raw: string) => raw.trim().replace(/^['"]|['"]$/g, "")
 
@@ -91,19 +114,30 @@ export const extractFirstMarkdownImage = (content: string): string => {
 
 const FNV1A_32_OFFSET_BASIS = 2166136261
 const FNV1A_32_PRIME = 16777619
-let cachedFingerprintInput = ""
-let cachedFingerprintValue = `${0}:${FNV1A_32_OFFSET_BASIS >>> 0}`
+const CONTENT_FINGERPRINT_CACHE_MAX_ENTRIES = 16
+const contentFingerprintLruCache = new Map<string, string>()
 
 export const computeContentFingerprint = (content: string): string => {
-  if (content === cachedFingerprintInput) return cachedFingerprintValue
+  const cached = contentFingerprintLruCache.get(content)
+  if (cached !== undefined) {
+    contentFingerprintLruCache.delete(content)
+    contentFingerprintLruCache.set(content, cached)
+    return cached
+  }
   let hash = FNV1A_32_OFFSET_BASIS
   for (let index = 0; index < content.length; index += 1) {
     hash ^= content.charCodeAt(index)
     hash = Math.imul(hash, FNV1A_32_PRIME)
   }
-  cachedFingerprintInput = content
-  cachedFingerprintValue = `${content.length}:${hash >>> 0}`
-  return cachedFingerprintValue
+  const digest = `${content.length}:${hash >>> 0}`
+  if (contentFingerprintLruCache.size >= CONTENT_FINGERPRINT_CACHE_MAX_ENTRIES) {
+    const oldestKey = contentFingerprintLruCache.keys().next().value
+    if (oldestKey !== undefined) {
+      contentFingerprintLruCache.delete(oldestKey)
+    }
+  }
+  contentFingerprintLruCache.set(content, digest)
+  return digest
 }
 
 export const normalizeSafeImageUrl = (raw: string): string => {
@@ -315,6 +349,10 @@ export const buildEditorStateFingerprint = ({
   tags,
   category,
   visibility,
+  scheduledAt = "",
+  seriesName = "",
+  seriesOrder = null,
+  canonicalUrl = "",
 }: LocalDraftFingerprintPayload) =>
   JSON.stringify({
     title,
@@ -329,6 +367,10 @@ export const buildEditorStateFingerprint = ({
     tags: dedupeStrings(tags),
     category: category.trim() ? normalizeCategoryValue(category) : "",
     visibility,
+    ...(scheduledAt ? { scheduledAt } : {}),
+    ...(seriesName ? { seriesName } : {}),
+    ...(seriesOrder !== null && seriesOrder !== undefined ? { seriesOrder } : {}),
+    ...(canonicalUrl ? { canonicalUrl } : {}),
   })
 
 export const parseEditorMeta = (

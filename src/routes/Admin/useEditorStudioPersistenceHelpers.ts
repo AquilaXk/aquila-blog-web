@@ -3,8 +3,15 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 import { apiFetch } from "src/apis/backend/client"
 import { normalizeCategoryValue } from "src/libs/utils"
 import { resolveEditorFailureRecovery, type EditorFailureRecovery } from "./editorFailureRecoveryModel"
-import { buildLocalDraftFingerprint } from "./editorStudioMetaModel"
+import {
+  buildLocalDraftFingerprint,
+  normalizeSafeCanonicalUrl,
+  POST_CONTENT_MAX_LENGTH,
+} from "./editorStudioMetaModel"
 import { captureLocalDraftCleanup } from "./editorStudioStorageModel"
+import { adminT } from "./adminI18n"
+import { isScheduleTimestampValid } from "./useEditorStudioPublishingMetadata"
+import type { SiteLanguage } from "src/libs/language"
 import type { LocalDraftBaselineReadySignal } from "./useEditorStudioDraftLifecycleModel"
 import type { CanonicalSummaryState, SummaryIntent } from "./EditorStudioWorkspaceControllerRootModel"
 import type { PostVisibility, RsData } from "src/types"
@@ -33,6 +40,10 @@ export type EditorFingerprintPayload = {
   tags: string[]
   category: string
   visibility: PostVisibility
+  scheduledAt?: string
+  seriesName?: string
+  seriesOrder?: number | null
+  canonicalUrl?: string
 }
 
 export type UseEditorStudioPersistenceParams = {
@@ -52,6 +63,10 @@ export type UseEditorStudioPersistenceParams = {
   postThumbnailFocusY: number
   postThumbnailZoom: number
   postVisibility: PostVisibility
+  postScheduledAt?: string
+  postSeriesName?: string
+  postSeriesOrder?: number | null
+  postCanonicalUrl?: string
   effectiveThumbnailUrl: string
   loadingKey: string
   getCurrentPostContent: () => string
@@ -116,6 +131,79 @@ export const buildTempDraftSaveSummaryFields = (
   }
 }
 
+export const buildPublishingMetadataPayload = (
+  postScheduledAt: string,
+  postSeriesName: string,
+  postSeriesOrder: number | null,
+  postCanonicalUrl: string
+) => {
+  const trimmedSeries = postSeriesName.trim()
+  const trimmedSchedule = postScheduledAt.trim()
+  const safeCanonical = postCanonicalUrl.trim() ? normalizeSafeCanonicalUrl(postCanonicalUrl) : ""
+  return {
+    scheduledAt: trimmedSchedule || null,
+    seriesName: trimmedSeries || null,
+    seriesOrder: trimmedSeries && postSeriesOrder ? postSeriesOrder : null,
+    canonicalUrl: safeCanonical || null,
+  }
+}
+
+export const resolveEffectivePublishingFlags = (
+  postVisibility: PostVisibility,
+  hasSchedule: boolean,
+  toFlags: (visibility: PostVisibility) => { published: boolean; listed: boolean }
+) => (hasSchedule ? { published: false, listed: postVisibility === "PUBLIC_LISTED" } : toFlags(postVisibility))
+
+export const validateEditorContentPreflight = (params: {
+  postTitle: string
+  currentPostContent: string
+  postThumbnailUrl: string
+  postCanonicalUrl: string
+  postSeriesOrder: number | null
+  postScheduledAt: string
+  postVisibility: PostVisibility
+  language: SiteLanguage
+  normalizeSafeImageUrl: (raw: string) => string
+  detectPublishPlaceholderIssue: (content: string) => string
+}): string | null => {
+  const {
+    postTitle,
+    currentPostContent,
+    postThumbnailUrl,
+    postCanonicalUrl,
+    postSeriesOrder,
+    postScheduledAt,
+    postVisibility,
+    language,
+    normalizeSafeImageUrl,
+    detectPublishPlaceholderIssue,
+  } = params
+  if (!postTitle.trim()) return adminT("editorValidationTitleRequired", language)
+  if (!currentPostContent.trim()) return adminT("editorValidationBodyRequired", language)
+  if (currentPostContent.length > POST_CONTENT_MAX_LENGTH) {
+    return adminT("editorValidationContentTooLong", language)
+  }
+  if (postThumbnailUrl.trim() && !normalizeSafeImageUrl(postThumbnailUrl)) {
+    return adminT("editorUploadInvalidThumbUrl", language)
+  }
+  if (postCanonicalUrl.trim() && !normalizeSafeCanonicalUrl(postCanonicalUrl)) {
+    return adminT("editorCanonicalUrlInvalid", language)
+  }
+  if (postSeriesOrder !== null && (!Number.isInteger(postSeriesOrder) || postSeriesOrder < 1)) {
+    return adminT("editorValidationInvalidSeriesOrder", language)
+  }
+  if (postScheduledAt.trim()) {
+    if (postVisibility === "PRIVATE") {
+      return adminT("editorValidationScheduledRequiresPublic", language)
+    }
+    if (!isScheduleTimestampValid(postScheduledAt)) {
+      return adminT("editorValidationScheduledPast", language)
+    }
+  }
+  const placeholderIssue = detectPublishPlaceholderIssue(currentPostContent)
+  return placeholderIssue || null
+}
+
 export const isBrowserOnline = () =>
   typeof navigator === "undefined" ? undefined : navigator.onLine
 
@@ -137,6 +225,10 @@ export const armLocalDraftFingerprintBaseline = (
     tags: dedupeStrings(payload.tags),
     category: payload.category.trim() ? normalizeCategoryValue(payload.category) : "",
     visibility: payload.visibility,
+    scheduledAt: payload.scheduledAt ?? "",
+    seriesName: payload.seriesName ?? "",
+    seriesOrder: payload.seriesOrder ?? null,
+    canonicalUrl: payload.canonicalUrl ?? "",
   })
   lastLocalDraftFingerprintRef.current = fingerprint
   return fingerprint
@@ -155,6 +247,10 @@ export type ServerTempDraftSaveExecutionInput = {
   effectiveThumbnailUrl: string
   postSummary: string
   postSummarySource: string
+  postScheduledAt?: string
+  postSeriesName?: string
+  postSeriesOrder?: number | null
+  postCanonicalUrl?: string
   getCurrentPostContent: () => string
   applyCanonicalWriteResponse: (response: RsData<PostWriteResult>) => CanonicalSummaryState | null
   buildSuccessfulWriteFingerprintPayload: (
@@ -180,6 +276,7 @@ export type ServerTempDraftSaveExecutionInput = {
 export const executeServerTempDraftSave = async ({
   silent, isEn, normalizedPostId, postTitle, currentPostContent, composed, postVersion,
   effectiveTags, effectiveCategory, effectiveThumbnailUrl, postSummary, postSummarySource,
+  postScheduledAt = "", postSeriesName = "", postSeriesOrder = null, postCanonicalUrl = "",
   getCurrentPostContent, applyCanonicalWriteResponse, buildSuccessfulWriteFingerprintPayload,
   buildEditorStateFingerprint, dedupeStrings, serverBaselineEditorFingerprintRef,
   lastLocalDraftFingerprintRef, cancelPendingAutosave, signalLocalDraftBaselineReady,
@@ -196,6 +293,7 @@ export const executeServerTempDraftSave = async ({
         "page"
       )
     }
+    const trimmedSeries = postSeriesName.trim()
     const response = await apiFetch<RsData<PostWriteResult>>(
       `/post/api/v1/posts/temp/${encodeURIComponent(normalizedPostId)}`,
       {
@@ -207,6 +305,10 @@ export const executeServerTempDraftSave = async ({
           summary: summaryPayload.summary,
           summaryMode: summaryPayload.summaryMode,
           thumbnail: effectiveThumbnailUrl.trim() || null,
+          scheduledAt: postScheduledAt.trim() || null,
+          seriesName: trimmedSeries || null,
+          seriesOrder: trimmedSeries && postSeriesOrder ? postSeriesOrder : null,
+          canonicalUrl: postCanonicalUrl.trim() || null,
         }),
       }
     )

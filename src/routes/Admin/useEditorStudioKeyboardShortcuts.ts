@@ -1,6 +1,7 @@
 // 참조 구현: TryGhost/Ghost (MIT) — client/src/components/editor/shortcuts.ts
 import { useEffect, useRef } from "react"
 import { apiFetch } from "src/apis/backend/client"
+import { useLanguage } from "src/libs/language"
 import { normalizeCategoryValue } from "src/libs/utils"
 import type { RsData } from "src/types"
 import type { EditorMode } from "./editorStudioState"
@@ -38,6 +39,10 @@ type UseEditorStudioKeyboardShortcutsParams = {
   isPublishModalOpen?: boolean
   onOpenPublishModal?: () => void
   onTogglePreviewMode?: () => void
+  postScheduledAt?: string
+  postSeriesName?: string
+  postSeriesOrder?: number | null
+  postCanonicalUrl?: string
 }
 
 export const buildTempDraftSaveSummaryPayload = (
@@ -77,8 +82,15 @@ export const useEditorStudioKeyboardShortcuts = ({
   isPublishModalOpen = false,
   onOpenPublishModal,
   onTogglePreviewMode,
+  postScheduledAt = "",
+  postSeriesName = "",
+  postSeriesOrder = null,
+  postCanonicalUrl = "",
 }: UseEditorStudioKeyboardShortcutsParams) => {
+  const { language } = useLanguage()
+  const isEn = language === "en"
   const stateRef = useRef({
+    isEn,
     isTempDraftMode,
     editorMode,
     postId,
@@ -103,10 +115,15 @@ export const useEditorStudioKeyboardShortcuts = ({
     isPublishModalOpen,
     onOpenPublishModal,
     onTogglePreviewMode,
+    postScheduledAt,
+    postSeriesName,
+    postSeriesOrder,
+    postCanonicalUrl,
   })
 
   useEffect(() => {
     stateRef.current = {
+      isEn,
       isTempDraftMode,
       editorMode,
       postId,
@@ -131,6 +148,10 @@ export const useEditorStudioKeyboardShortcuts = ({
       isPublishModalOpen,
       onOpenPublishModal,
       onTogglePreviewMode,
+      postScheduledAt,
+      postSeriesName,
+      postSeriesOrder,
+      postCanonicalUrl,
     }
   })
 
@@ -206,7 +227,13 @@ export const useEditorStudioKeyboardShortcuts = ({
         })
         try {
           state.setLoadingKey("serverTempDraftSave")
-          state.setPublishStatus({ tone: "loading", text: "서버 임시초안을 저장하는 중입니다..." }, "page")
+          state.setPublishStatus(
+            {
+              tone: "loading",
+              text: state.isEn ? "Saving server draft..." : "서버 임시초안을 저장하는 중입니다...",
+            },
+            "page"
+          )
 
           const summaryPayload = buildTempDraftSaveSummaryPayload(
             state.postSummary,
@@ -223,6 +250,10 @@ export const useEditorStudioKeyboardShortcuts = ({
                 summary: summaryPayload.summary,
                 summaryMode: summaryPayload.summaryMode,
                 thumbnail: state.effectiveThumbnailUrl.trim() || null,
+                scheduledAt: state.postScheduledAt.trim() || null,
+                seriesName: state.postSeriesName.trim() || null,
+                seriesOrder: state.postSeriesName.trim() && state.postSeriesOrder ? state.postSeriesOrder : null,
+                canonicalUrl: state.postCanonicalUrl.trim() || null,
               }),
             }
           )
@@ -231,11 +262,22 @@ export const useEditorStudioKeyboardShortcuts = ({
             state.setPostVersion(response.data.version)
           }
           state.saveLocalDraft({ silent: true, force: true })
-          state.setPublishStatus({ tone: "success", text: "서버 임시초안이 안전하게 저장되었습니다." }, "page")
+          state.setPublishStatus(
+            {
+              tone: "success",
+              text: state.isEn ? "Server draft saved safely." : "서버 임시초안이 안전하게 저장되었습니다.",
+            },
+            "page"
+          )
         } catch {
           state.saveLocalDraft({ silent: true, force: true })
           state.setPublishStatus(
-            { tone: "error", text: "서버 임시저장에 실패하여 로컬 초안으로 안전하게 보관되었습니다." },
+            {
+              tone: "error",
+              text: state.isEn
+                ? "Server save failed; kept safely as a local draft."
+                : "서버 임시저장에 실패하여 로컬 초안으로 안전하게 보관되었습니다.",
+            },
             "page"
           )
         } finally {
@@ -252,8 +294,12 @@ export const useEditorStudioKeyboardShortcuts = ({
       state.saveLocalDraft({ silent: false })
       const noticeText =
         state.editorMode === "edit"
-          ? "브라우저 로컬 초안에 안전하게 저장되었습니다."
-          : "새 글 로컬 초안이 저장되었습니다."
+          ? state.isEn
+            ? "Saved safely to browser local draft."
+            : "브라우저 로컬 초안에 안전하게 저장되었습니다."
+          : state.isEn
+            ? "New post local draft saved."
+            : "새 글 로컬 초안이 저장되었습니다."
       state.setPublishStatus({ tone: "success", text: noticeText }, "page")
     }
 

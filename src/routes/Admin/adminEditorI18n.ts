@@ -1,5 +1,6 @@
 // 참조 구현: TryGhost/Ghost (MIT) & payloadcms/payload (MIT) — 에디터 전용 한/영 사전 모듈
 import type { SiteLanguage } from "src/libs/language"
+import { ADMIN_EDITOR_EN_TRANSLATIONS } from "./adminEditorI18nEn"
 
 export type AdminEditorI18nKey =
   | "editorPageHeading"
@@ -167,6 +168,51 @@ export type AdminEditorI18nKey =
   | "editorSectionRevisionsEyebrow"
   | "editorPublishCancelAria"
   | "editorStatusLineCol"
+  | "editorVisibilitySectionKicker"
+  | "editorVisibilityQuestion"
+  | "editorVisibilityGroupAria"
+  | "editorVisibilityFeedHelp"
+  | "editorCoverOptionalHeading"
+  | "editorCoverAutoSetupDesc"
+  | "editorCoverManualBadge"
+  | "editorCoverAutoBadge"
+  | "editorThumbFocusHeading"
+  | "editorThumbFocusDesc"
+  | "editorCardMetaHeading"
+  | "editorCardMetaDesc"
+  | "editorPanelOpenLabel"
+  | "editorSectionPublishingEyebrow"
+  | "editorScheduleLabel"
+  | "editorScheduleNow"
+  | "editorScheduleLater"
+  | "editorScheduleInputLabel"
+  | "editorScheduleClear"
+  | "editorSchedulePrivateHint"
+  | "editorSchedulePastError"
+  | "editorScheduleBadgePrefix"
+  | "editorActionSchedule"
+  | "editorActionUpdateSchedule"
+  | "editorSeriesNameLabel"
+  | "editorSeriesNamePlaceholder"
+  | "editorSeriesOrderLabel"
+  | "editorSeriesOrderPlaceholder"
+  | "editorCanonicalUrlLabel"
+  | "editorCanonicalUrlPlaceholder"
+  | "editorCanonicalUrlInvalid"
+  | "editorTempDraftsButton"
+  | "editorTempDraftsTitle"
+  | "editorTempDraftsCreateNew"
+  | "editorTempDraftsEmpty"
+  | "editorTempDraftsCurrent"
+  | "editorTempDraftsOpen"
+  | "editorTempDraftsDelete"
+  | "editorTempDraftsDeleteConfirm"
+  | "editorTempDraftsLoading"
+  | "editorTempDraftsCloseAria"
+  | "editorValidationContentTooLong"
+  | "editorValidationInvalidSeriesOrder"
+  | "editorValidationScheduledRequiresPublic"
+  | "editorValidationScheduledPast"
 
 export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI18nKey, string>> = {
   ko: {
@@ -335,172 +381,51 @@ export const ADMIN_EDITOR_TRANSLATIONS: Record<SiteLanguage, Record<AdminEditorI
     editorSectionRevisionsEyebrow: "05 REVISIONS",
     editorPublishCancelAria: "발행 설정 취소",
     editorStatusLineCol: "줄 {line}, 열 {col}",
+    editorVisibilitySectionKicker: "노출 범위",
+    editorVisibilityQuestion: "누가 이 글을 볼 수 있나요?",
+    editorVisibilityGroupAria: "노출 범위 선택",
+    editorVisibilityFeedHelp: "메인 피드 노출은 전체 공개에서만 활성화됩니다.",
+    editorCoverOptionalHeading: "공유 대표 이미지 직접 지정 (선택)",
+    editorCoverAutoSetupDesc: "비워두면 본문 첫 이미지 또는 제목 기반 OG 카드가 공유 미리보기에 자동 적용됩니다.",
+    editorCoverManualBadge: "수동 지정됨",
+    editorCoverAutoBadge: "자동 적용",
+    editorThumbFocusHeading: "썸네일 위치 조정",
+    editorThumbFocusDesc: "드래그/확대로 공유 대표 이미지 초점을 맞춥니다.",
+    editorCardMetaHeading: "카드 메타 편집",
+    editorCardMetaDesc: "썸네일 URL과 업로드 방식을 설정합니다.",
+    editorPanelOpenLabel: "열기",
+    editorSectionPublishingEyebrow: "06 PUBLISHING",
+    editorScheduleLabel: "발행 일정",
+    editorScheduleNow: "즉시 발행",
+    editorScheduleLater: "예약 발행",
+    editorScheduleInputLabel: "예약 일시",
+    editorScheduleClear: "예약 해제",
+    editorSchedulePrivateHint: "비공개 글은 예약 발행을 설정할 수 없습니다. 전체 공개 또는 링크 공개를 선택해주세요.",
+    editorSchedulePastError: "예약 발행 시각은 현재 시각 이후여야 합니다.",
+    editorScheduleBadgePrefix: "예약",
+    editorActionSchedule: "예약 발행",
+    editorActionUpdateSchedule: "예약 수정",
+    editorSeriesNameLabel: "연재 시리즈 (선택)",
+    editorSeriesNamePlaceholder: "예: Compiler Design",
+    editorSeriesOrderLabel: "회차 순번",
+    editorSeriesOrderPlaceholder: "1",
+    editorCanonicalUrlLabel: "정본 URL (교차 게시 선택)",
+    editorCanonicalUrlPlaceholder: "https://origin.example.com/posts/...",
+    editorCanonicalUrlInvalid: "http:// 또는 https://로 시작하는 유효한 URL만 사용할 수 있습니다.",
+    editorTempDraftsButton: "임시글",
+    editorTempDraftsTitle: "서버 임시초안 목록",
+    editorTempDraftsCreateNew: "새 임시초안",
+    editorTempDraftsEmpty: "저장된 서버 임시초안이 없습니다.",
+    editorTempDraftsCurrent: "현재 편집 중",
+    editorTempDraftsOpen: "불러오기",
+    editorTempDraftsDelete: "삭제",
+    editorTempDraftsDeleteConfirm: "이 임시초안을 삭제할까요? 삭제한 초안은 복구할 수 없습니다.",
+    editorTempDraftsLoading: "임시초안 목록을 불러오는 중입니다...",
+    editorTempDraftsCloseAria: "임시초안 목록 닫기",
+    editorValidationContentTooLong: "본문 길이가 최대 500,000자를 초과했습니다. 내용을 분할해 주세요.",
+    editorValidationInvalidSeriesOrder: "시리즈 회차 순번은 1 이상의 정수여야 합니다.",
+    editorValidationScheduledRequiresPublic: "비공개 글에는 예약 발행을 설정할 수 없습니다.",
+    editorValidationScheduledPast: "예약 발행 시각은 현재 시각 이후여야 합니다.",
   },
-  en: {
-    editorPageHeading: "Edit Post",
-    editorBackToPosts: "Posts",
-    editorOutlineToggle: "Toggle document outline",
-    editorOutlineTitle: "Outline",
-    editorOutlineOpen: "Open document outline",
-    editorOutlineClose: "Close outline",
-    editorOutlineHeadingsSuffix: "",
-    editorOutlineHeadingUnit: "headings",
-    editorOutlineReadingPrefix: "~",
-    editorOutlineReadingSuffix: "min read",
-    editorOutlineEmpty: "Add a title and headings to view the outline.",
-    editorSaveStatusAria: "Editor save status",
-    editorSelectedCharsPrefix: "Selected",
-    editorCharUnit: "chars",
-    editorWordUnit: "words",
-    editorMinutePrefix: "~",
-    editorMinuteUnit: "min",
-    editorLinkLabel: "Links",
-    editorLinkWarnLabel: "warn",
-    editorZenToggle: "Toggle focus mode",
-    editorZenTitle: "Focus mode (hide sidebars · Cmd/Ctrl+Shift+F)",
-    editorZenLabel: "Focus mode",
-    editorZenActiveLabel: "Focus on",
-    editorSettingsToggle: "Toggle settings panel",
-    editorSettingsLabel: "Settings",
-    editorGuideButton: "Markdown Guide",
-    editorTitlePlaceholder: "Enter post title",
-    editorSubtitleLabel: "Subtitle",
-    editorSummaryLabel: "Excerpt",
-    editorSummaryPlaceholder: "Optional summary or subtitle",
-    editorBodyPlaceholder: "Write your post or press '/' to insert blocks...",
-    editorActiveLinePlaceholder: "Press '/' to insert a block or start typing...",
-    editorReadingPreviewLoading: "Loading preview...",
-    editorPropsToggleAria: "Toggle properties",
-    editorPropsLabel: "Properties",
-    editorPropsCollapse: "Hide ▲",
-    editorPropsExpand: "Show",
-    editorTagsUnitSuffix: "tags",
-    editorTagInputAria: "Tags input",
-    editorTagPlaceholder: "Add tag and press Enter",
-    editorTagDeleteSuffix: "remove",
-    editorCategoryBadgePrefix: "Category",
-    editorPublishSettingsAria: "Publish settings",
-    editorSettingsHeading: "Post Settings",
-    editorSettingsCloseAria: "Close settings panel",
-    editorVisibilityLabel: "Visibility",
-    editorTagsHeading: "Tags",
-    editorPublishTagsAria: "Post tags",
-    editorTagAddPlaceholder: "Add tag",
-    editorTagAddAria: "Add tag",
-    editorCategoryOptional: "Category (optional)",
-    editorCategoryPlaceholder: "Enter or select category",
-    editorCategoryClearAria: "Clear category",
-    editorCategoryClear: "Clear",
-    editorCategoryHint: "Choose one broad category per post; add specific topics as tags.",
-    editorLinkWarningPrefix: "",
-    editorLinkWarningSuffix: "incomplete link(s) detected. Please complete the URL.",
-    editorReloadLatest: "Reload latest server post",
-    editorLoadingHeading: "Preparing editor...",
-    editorLoadingSub: "Please wait a moment.",
-    editorDraftBannerTitle: "Local browser draft found.",
-    editorDraftSelectAria: "Select local draft to restore",
-    editorDraftSelectPlaceholder: "Select a draft",
-    editorDraftRestore: "Restore",
-    editorDraftDelete: "Delete",
-    editorDraftDismiss: "Dismiss for session",
-    editorActionPublishSettings: "Publish Settings",
-    editorActionModifySettings: "Update Settings",
-    editorActionNewPost: "New Post",
-    editorActionPublishing: "Publishing...",
-    editorActionPublish: "Publish",
-    editorActionUpdating: "Updating...",
-    editorActionUpdate: "Save Changes",
-    editorActionCreating: "Creating...",
-    editorActionOpenPublish: "Open Publish",
-    editorActionOpenModify: "Open Update",
-    editorStatusSaving: "Saving",
-    editorStatusSaved: "Saved",
-    editorStatusAutoSaved: "Auto-saved",
-    editorStatusLocalAutoSaved: "Saved locally",
-    editorStatusUnsaved: "Unsaved changes",
-    editorVisibilityPublicLabel: "Public",
-    editorVisibilityPublicDesc: "Visible in feed and search.",
-    editorVisibilityUnlistedLabel: "Unlisted",
-    editorVisibilityUnlistedDesc: "Only accessible via direct link.",
-    editorVisibilityPrivateLabel: "Private",
-    editorVisibilityPrivateDesc: "Visible to admin only.",
-    editorReadinessTitle: "Publish Readiness",
-    editorReadinessItemsUnit: "items",
-    editorReadinessTitleRow: "Title",
-    editorReadinessEntered: "Ready",
-    editorReadinessRequired: "Needed",
-    editorReadinessBodyRow: "Content",
-    editorReadinessBodyWordSuffix: "words",
-    editorReadinessWriteNeeded: "Needed",
-    editorReadinessSummaryRow: "Excerpt",
-    editorReadinessManual: "Manual",
-    editorReadinessAuto: "Auto",
-    editorReadinessTagRow: "Tags",
-    editorReadinessCountUnit: "",
-    editorReadinessLinkRow: "Links",
-    editorReadinessLinkWarn: "Warn",
-    editorReadinessLinkOk: "OK",
-    editorFeatureUploadingCover: "Uploading cover image...",
-    editorFeatureAddCover: "+ Add cover image",
-    editorFeaturePreviewAlt: "Featured cover preview",
-    editorFeatureNoImage: "No image",
-    editorFeatureBadge: "Cover set",
-    editorFeatureUploadingShort: "Uploading...",
-    editorFeatureChangeImage: "Change image",
-    editorFeatureResetAuto: "Reset to auto",
-    editorGuideTitle: "Markdown Authoring Guide",
-    editorGuideClose: "Close guide",
-    editorGuideIntro: "The post title acts as H1, while the body renders identically across the live editor and published page.",
-    editorGuideColElement: "Element",
-    editorGuideColExample: "Syntax",
-    editorGuideColShortcut: "Shortcut",
-    editorGuideRepoLabel: "Repository",
-    editorRevisionCompare: "Compare diff",
-    editorRevisionCloseCompare: "Hide diff",
-    editorRevisionLoadingDiff: "Loading revision snapshot diff...",
-    editorRevisionLoadError: "Failed to load revision snapshot content.",
-    editorRevisionNoChanges: "No differences against the current draft.",
-    editorRevisionTruncated: "Document exceeds diff line or character limit; showing summary only.",
-    editorRevisionTitleChanged: "Title changed",
-    editorRevisionTagsChanged: "Tags changed",
-    editorRevisionLinesAdded: "Added",
-    editorRevisionLinesRemoved: "Removed",
-    editorRevisionSnapshotTitle: "Revision",
-    editorRevisionCurrentTitle: "Current",
-    editorCloseLabel: "Close",
-    editorVisibilityPublicFull: "Public (listed)",
-    editorVisibilityUnlistedFull: "Unlisted (link only)",
-    editorVisibilityPrivateFull: "Private",
-    editorUploadInvalidResponse: "Invalid upload response format.",
-    editorUploadImageMetaError: "Failed to parse image markdown metadata.",
-    editorUploadInvalidImageUrl: "Disallowed image URL format.",
-    editorUploadInvalidThumbUrl: "Disallowed thumbnail URL format.",
-    editorUploadImageDone: "Image upload completed.",
-    editorUploadFileDone: "Attachment upload completed.",
-    editorUploadThumbDone: "Thumbnail upload completed.",
-    editorValidationTitleRequired: "Please enter a title.",
-    editorValidationBodyRequired: "Please enter post content.",
-    editorValidationAlreadyEditMode: "Currently in edit mode. Switch to new-post mode before creating a post.",
-    editorValidationSelectPost: "Please select a post ID to edit first.",
-    editorValidationVersionMissing: "Failed to load the latest post version. Please reopen the post.",
-    editorValidationNewPostMissing: "Please load the draft to publish first.",
-    editorValidationNewPostVersionMissing: "Failed to load draft version. Please reopen the post.",
-    editorValidationInvalidSummary: "Invalid canonical summary response from server.",
-    editorSaveWriting: "Creating post...",
-    editorSaveModifying: "Updating post...",
-    editorSaveTempPublishing: "Publishing new post...",
-    editorSaveTempDone: "New post created.",
-    editorVisibilityShortPublic: "PUBLIC",
-    editorVisibilityShortUnlisted: "UNLISTED",
-    editorVisibilityShortPrivate: "PRIVATE",
-    editorVisibilityShortDraft: "DRAFT",
-    editorCoverEyebrow: "COVER",
-    editorSectionVisibilityEyebrow: "01 VISIBILITY",
-    editorSectionTaxonomyEyebrow: "02 TAXONOMY",
-    editorSectionExcerptEyebrow: "03 EXCERPT",
-    editorSectionCloudEyebrow: "04 CLOUD ASSETS",
-    editorSectionRevisionsEyebrow: "05 REVISIONS",
-    editorPublishCancelAria: "Cancel publish settings",
-    editorStatusLineCol: "Ln {line}, Col {col}",
-  },
+  en: ADMIN_EDITOR_EN_TRANSLATIONS,
 }

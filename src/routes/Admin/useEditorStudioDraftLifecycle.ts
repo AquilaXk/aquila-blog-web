@@ -79,6 +79,10 @@ type EditorFingerprintPayload = {
   tags: string[]
   category: string
   visibility: PostVisibility
+  scheduledAt?: string
+  seriesName?: string
+  seriesOrder?: number | null
+  canonicalUrl?: string
 }
 
 type UseEditorStudioDraftLifecycleParams = {
@@ -100,6 +104,10 @@ type UseEditorStudioDraftLifecycleParams = {
   postTags: string[]
   postCategory: string
   postVisibility: PostVisibility
+  postScheduledAt?: string
+  postSeriesName?: string
+  postSeriesOrder?: number | null
+  postCanonicalUrl?: string
   editorMode: EditorMode
   setEditorMode: StudioSetState<EditorMode>
   setIsTempDraftMode: StudioSetState<boolean>
@@ -118,6 +126,10 @@ type UseEditorStudioDraftLifecycleParams = {
   setPostTags: StudioSetState<string[]>
   setPostCategory: StudioSetState<string>
   setPostVisibility: StudioSetState<PostVisibility>
+  setPostScheduledAt?: StudioSetState<string>
+  setPostSeriesName?: StudioSetState<string>
+  setPostSeriesOrder?: StudioSetState<number | null>
+  setPostCanonicalUrl?: StudioSetState<string>
   setLocalDraftSavedAt: StudioSetState<string>
   setLoadingKey: StudioSetState<string>
   setResult: StudioSetState<string>
@@ -141,7 +153,7 @@ type UseEditorStudioDraftLifecycleParams = {
     post: Pick<PostForEditor, "title" | "published" | "listed" | "tempDraft">,
     snapshot: ResolvedEditorMetaSnapshot
   ) => boolean
-  toVisibility: (published: boolean, listed: boolean) => PostVisibility
+  toVisibility: (published: boolean, listed: boolean, scheduledAt?: string | null) => PostVisibility
   requestTempPostWithConflictRetry: (
     loadExistingTempPostForRecovery: () => Promise<PostForEditor | null>
   ) => Promise<RsData<PostForEditor>>
@@ -163,14 +175,16 @@ export const useEditorStudioDraftLifecycle = ({
   loadingKey, normalizeCategoryValue, persistLocalDraft, postCategory, postContent,
   getCurrentPostContent, postId, postSummary, postSummarySource, summaryIntent,
   postTags, postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom,
-  postTitle, postVersion, postVisibility, pretty, readLocalDraft, removeLocalDraft,
+  postTitle, postVersion, postVisibility, postScheduledAt = "", postSeriesName = "",
+  postSeriesOrder = null, postCanonicalUrl = "", pretty, readLocalDraft, removeLocalDraft,
   requestTempPostWithConflictRetry, resolveEditorMetaSnapshot, router,
   serverBaselineEditorFingerprintRef, setEditorMode, setIsNewEditorBootstrapPending,
   setIsTempDraftMode, setLoadingKey, setLocalDraftSavedAt,
   setPostCategory, setPostContent,
   setPostId, setPostSummary, setPostSummarySource, setSummaryIntent, setPostTags,
   setPostThumbnailFocusX, setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom,
-  setPostTitle, setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl,
+  setPostTitle, setPostVersion, setPostVisibility, setPostScheduledAt, setPostSeriesName,
+  setPostSeriesOrder, setPostCanonicalUrl, setPreviewThumbnailSourceUrl,
   setPublishStatus, setResult, syncEditorMeta, tempPostRequestRef, toEditorPostRoute,
   toVisibility,
 }: UseEditorStudioDraftLifecycleParams) => {
@@ -193,12 +207,14 @@ export const useEditorStudioDraftLifecycle = ({
     lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, loadingKey, normalizeCategoryValue,
     persistLocalDraft, postCategory, postContent, getCurrentPostContent, postId, postSummary,
     postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
-    postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility, readLocalDraft,
+    postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility,
+    postScheduledAt, postSeriesName, postSeriesOrder, postCanonicalUrl, readLocalDraft,
     removeLocalDraft, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
     setPostCategory, setPostContent, setPostId, setPostSummary,
     setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
     setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
-    setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
+    setPostVersion, setPostVisibility, setPostScheduledAt, setPostSeriesName,
+    setPostSeriesOrder, setPostCanonicalUrl, setPreviewThumbnailSourceUrl, setPublishStatus,
   })
 
   const restoreLocalDraft = useCallback(() => {
@@ -232,6 +248,10 @@ export const useEditorStudioDraftLifecycle = ({
       setPostThumbnailZoom(defaultThumbnailZoom)
       setPostTags([])
       setPostCategory("")
+      setPostScheduledAt?.("")
+      setPostSeriesName?.("")
+      setPostSeriesOrder?.(null)
+      setPostCanonicalUrl?.("")
     }
     setPublishStatus(
       {
@@ -244,8 +264,9 @@ export const useEditorStudioDraftLifecycle = ({
     activateComposeSurface, defaultThumbnailFocusX, defaultThumbnailFocusY,
     defaultThumbnailZoom, lastWriteFingerprintRef,
     lastWriteIdempotencyKeyRef, serverBaselineEditorFingerprintRef, setEditorMode,
-    setIsTempDraftMode, setLoadingKey, setPostCategory,
-    setPostContent, setPostId, setPostSummary, setPostSummarySource, setSummaryIntent,
+    setIsTempDraftMode, setLoadingKey, setPostCanonicalUrl, setPostCategory,
+    setPostContent, setPostId, setPostScheduledAt, setPostSeriesName, setPostSeriesOrder,
+    setPostSummary, setPostSummarySource, setSummaryIntent,
     setPostTags, setPostThumbnailFocusX, setPostThumbnailFocusY, setPostThumbnailUrl,
     setPostThumbnailZoom, setPostTitle, setPostVersion, setPreviewThumbnailSourceUrl,
     setPublishStatus,
@@ -276,7 +297,7 @@ export const useEditorStudioDraftLifecycle = ({
       const visibility =
         isTempDraft && !post.published && !post.listed
           ? "PUBLIC_LISTED"
-          : toVisibility(!!post.published, !!post.listed)
+          : toVisibility(!!post.published, !!post.listed, post.scheduledAt)
       const resolvedSummary = resolvePersistedSummaryResult(
         { summary: "", summarySource: "NONE", intent: { kind: "unchanged" } },
         { summary: post.summary, source: post.summarySource },
@@ -294,6 +315,10 @@ export const useEditorStudioDraftLifecycle = ({
         shouldMaskTempPlaceholder,
         title,
         visibility,
+        scheduledAt: typeof post.scheduledAt === "string" ? post.scheduledAt : "",
+        seriesName: typeof post.seriesName === "string" ? post.seriesName : "",
+        seriesOrder: typeof post.seriesOrder === "number" ? post.seriesOrder : null,
+        canonicalUrl: typeof post.canonicalUrl === "string" ? post.canonicalUrl : "",
         fingerprintPayload: {
           title,
           content: snapshot.body,
@@ -307,6 +332,10 @@ export const useEditorStudioDraftLifecycle = ({
           tags: snapshot.tags,
           category: snapshot.category,
           visibility,
+          scheduledAt: typeof post.scheduledAt === "string" ? post.scheduledAt : "",
+          seriesName: typeof post.seriesName === "string" ? post.seriesName : "",
+          seriesOrder: typeof post.seriesOrder === "number" ? post.seriesOrder : null,
+          canonicalUrl: typeof post.canonicalUrl === "string" ? post.canonicalUrl : "",
         } satisfies EditorFingerprintPayload,
       }
     },
@@ -324,6 +353,10 @@ export const useEditorStudioDraftLifecycle = ({
       const loadedPostState = resolveLoadedPostState(resolvedPost)
       setPostTitle(loadedPostState.title)
       setPostVisibility(loadedPostState.visibility)
+      setPostScheduledAt?.(loadedPostState.scheduledAt)
+      setPostSeriesName?.(loadedPostState.seriesName)
+      setPostSeriesOrder?.(loadedPostState.seriesOrder)
+      setPostCanonicalUrl?.(loadedPostState.canonicalUrl)
       serverBaselineEditorFingerprintRef.current = buildEditorStateFingerprint(
         loadedPostState.fingerprintPayload
       )
@@ -334,7 +367,8 @@ export const useEditorStudioDraftLifecycle = ({
     },
     [
       applyLoadedPostContext, buildEditorStateFingerprint, pretty, resolveLoadedPostState,
-      serverBaselineEditorFingerprintRef, setPostTitle, setPostVisibility, setResult,
+      serverBaselineEditorFingerprintRef, setPostCanonicalUrl, setPostScheduledAt,
+      setPostSeriesName, setPostSeriesOrder, setPostTitle, setPostVisibility, setResult,
       signalLocalDraftBaselineReady,
     ]
   )

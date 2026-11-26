@@ -6,7 +6,8 @@
  */
 import { EDITOR_SYNTAX_COLORS } from "./markdownEditorSyntaxThemeTokens"
 
-export const liveTableAndCardThemeSpec: Record<string, Record<string, string | number>> = {
+type ThemeStyleBlock = Record<string, string | number | Record<string, string | number>>
+export const liveTableAndCardThemeSpec: Record<string, ThemeStyleBlock> = {
   ".cm-live-toggle-block": {
     border: `1px solid ${EDITOR_SYNTAX_COLORS.blockCardBorder}`,
     backgroundColor: EDITOR_SYNTAX_COLORS.blockCardSurface,
@@ -396,6 +397,16 @@ export const liveTableAndCardThemeSpec: Record<string, Record<string, string | n
     font: "inherit",
     padding: "0",
     margin: "0",
+  },
+  "@media (pointer: coarse)": {
+    ".cm-live-table-cell-input": {
+      fontSize: "1rem",
+      lineHeight: "1.45",
+      minHeight: "28px",
+    },
+    ".cm-live-table th, .cm-live-table td": {
+      padding: "10px 12px",
+    },
   },
   ".cm-live-table-footer-row": { display: "flex", alignItems: "stretch", gap: "6px" },
   ".cm-live-table-add-col": {

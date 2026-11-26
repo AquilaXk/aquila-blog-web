@@ -12,6 +12,7 @@ import {
   EDITOR_EMPTY_BODY_PLACEHOLDER,
   editorT,
 } from "./markdownEditorI18n"
+import { useModShortcutLabel } from "./markdownEditorToolbarModel"
 import { planFormatShortcutMutation } from "./markdownEditorKeyboardModel"
 import { EditorRoot, ToolbarError, ToolbarHiddenInput, LiveEditorBody } from "./MarkdownEditor.styles"
 import { applyPlannedTextMutationToValue, type PlannedTextMutation } from "./markdownEditorTextMutation"
@@ -116,6 +117,7 @@ export const MarkdownEditor = ({
   onUploadingChange, onUploadImage, onUploadFile, onRequestCloudAsset,
 }: MarkdownEditorProps) => {
   const { language } = useLanguage()
+  const activeModLabel = useModShortcutLabel()
   const [uploadError, setUploadError] = useState("")
   const [draftValue, setDraftValue] = useState(value)
   const [viewMode, setViewModeState] = useState<MarkdownEditorSurfaceMode>("live")
@@ -471,7 +473,7 @@ export const MarkdownEditor = ({
         />
         <MarkdownEditorLiveSurface
           ref={liveSurfaceRef} value={draftValue} disabled={disabled} disableMermaid={disableMermaid}
-          mode={viewMode} onToggleViewMode={cycleViewMode} ariaDescription={editorT("keyboardHelp", language)}
+          mode={viewMode} onToggleViewMode={cycleViewMode} ariaDescription={editorT("keyboardHelp", language, activeModLabel)}
           onChange={handleLiveChange} onSelectionChange={handleLiveSelectionChange}
           onRequestFocusTitle={onRequestFocusTitle} onKeyDownCapture={handleTextareaKeyDown}
           onPasteCapture={handlePaste} onDragOver={handleDragOver} onDropCapture={handleDrop}

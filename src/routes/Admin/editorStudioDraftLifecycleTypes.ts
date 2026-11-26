@@ -27,6 +27,10 @@ export type UseEditorStudioLocalDraftLifecycleParams = {
   postTags: string[]
   postCategory: string
   postVisibility: PostVisibility
+  postScheduledAt?: string
+  postSeriesName?: string
+  postSeriesOrder?: number | null
+  postCanonicalUrl?: string
   setEditorMode: StudioSetState<EditorMode>
   setIsTempDraftMode: StudioSetState<boolean>
   setPostId: StudioSetState<string>
@@ -44,6 +48,10 @@ export type UseEditorStudioLocalDraftLifecycleParams = {
   setPostTags: StudioSetState<string[]>
   setPostCategory: StudioSetState<string>
   setPostVisibility: StudioSetState<PostVisibility>
+  setPostScheduledAt?: StudioSetState<string>
+  setPostSeriesName?: StudioSetState<string>
+  setPostSeriesOrder?: StudioSetState<number | null>
+  setPostCanonicalUrl?: StudioSetState<string>
   setLocalDraftSavedAt: StudioSetState<string>
   setPublishStatus: (notice: PublishNotice, target?: PublishTarget) => void
   dedupeStrings: (items: string[]) => string[]

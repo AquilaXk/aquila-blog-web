@@ -345,6 +345,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/adm/posts/temp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 관리자용 임시초안 목록 */
+        get: operations["listTempDrafts"];
+        put?: never;
+        /** 관리자용 새 임시초안 생성 */
+        post: operations["createNewTempDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/post/api/v1/adm/posts/bulk": {
         parameters: {
             query?: never;
@@ -751,6 +769,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/posts/{id}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/post/api/v1/posts/{id}/backlinks": {
         parameters: {
             query?: never;
@@ -1043,6 +1077,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/adm/posts/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 관리자용 연재 시리즈 목록 */
+        get: operations["listSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/post/api/v1/adm/posts/deleted": {
         parameters: {
             query?: never;
@@ -1288,6 +1339,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/post/api/v1/adm/posts/temp/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** 관리자용 임시초안 삭제 */
+        delete: operations["deleteTempDraft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/member/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -1368,6 +1436,12 @@ export interface components {
             /** @enum {string|null} */
             summaryMode?: "AUTO" | "MANUAL" | null;
             summary?: string | null;
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            seriesName?: string | null;
+            /** Format: int32 */
+            seriesOrder?: number | null;
+            canonicalUrl?: string | null;
         };
         PostWriteResultDto: {
             /** Format: int64 */
@@ -1380,6 +1454,12 @@ export interface components {
             summary?: string;
             /** @enum {string} */
             summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            seriesName?: string | null;
+            /** Format: int32 */
+            seriesOrder?: number | null;
+            canonicalUrl?: string | null;
         };
         RsDataPostWriteResultDto: {
             resultCode?: string;
@@ -1429,6 +1509,20 @@ export interface components {
              * @example https://example.com/thumb.jpg
              */
             thumbnail?: string | null;
+            /**
+             * Format: date-time
+             * @description 예약 발행 시각
+             */
+            scheduledAt?: string | null;
+            /** @description 연재 시리즈명 */
+            seriesName?: string | null;
+            /**
+             * Format: int32
+             * @description 시리즈 순번
+             */
+            seriesOrder?: number | null;
+            /** @description 교차 게시 정본 URL */
+            canonicalUrl?: string | null;
         };
         ProfileCardLinkItemRequest: {
             icon?: string;
@@ -1657,6 +1751,12 @@ export interface components {
             /** @enum {string} */
             summaryMode: "AUTO" | "MANUAL";
             summary?: string | null;
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            seriesName?: string | null;
+            /** Format: int32 */
+            seriesOrder?: number | null;
+            canonicalUrl?: string | null;
         };
         PostDto: {
             /** Format: int64 */
@@ -1686,6 +1786,12 @@ export interface components {
             category?: string[];
             /** @enum {string} */
             summarySource?: "MANUAL" | "LEADING_BLOCK" | "EXTRACTED" | "MIGRATED" | "NONE";
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            seriesName?: string | null;
+            /** Format: int32 */
+            seriesOrder?: number | null;
+            canonicalUrl?: string | null;
         };
         RsDataPostDto: {
             resultCode?: string;
@@ -1737,6 +1843,12 @@ export interface components {
             /** @enum {string} */
             contentHtmlTrustState?: "TRUSTED_CURRENT" | "UNKNOWN" | "REJECTED";
             thumbnail?: string | null;
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            seriesName?: string | null;
+            /** Format: int32 */
+            seriesOrder?: number | null;
+            canonicalUrl?: string | null;
         };
         RsDataPostWithContentDto: {
             resultCode?: string;
@@ -2185,6 +2297,19 @@ export interface components {
             /** Format: int32 */
             numberOfElements?: number;
             paged?: boolean;
+        };
+        PublicPostSeriesResBody: {
+            seriesName?: string | null;
+            items?: components["schemas"]["PublicSeriesPostItemDto"][];
+        };
+        PublicSeriesPostItemDto: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            /** Format: int32 */
+            seriesOrder?: number | null;
+            /** Format: date-time */
+            createdAt?: string;
         };
         PublicPostBacklinkItemDto: {
             /** Format: int64 */
@@ -3083,6 +3208,46 @@ export interface operations {
             };
         };
     };
+    listTempDrafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PostDto"][];
+                };
+            };
+        };
+    };
+    createNewTempDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataPostWithContentDto"];
+                };
+            };
+        };
+    };
     bulkAction: {
         parameters: {
             query?: never;
@@ -3821,6 +3986,28 @@ export interface operations {
             };
         };
     };
+    getSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicPostSeriesResBody"];
+                };
+            };
+        };
+    };
     getBacklinks: {
         parameters: {
             query?: never;
@@ -4237,6 +4424,26 @@ export interface operations {
             };
         };
     };
+    listSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
+                };
+            };
+        };
+    };
     getDeletedItems: {
         parameters: {
             query?: {
@@ -4530,6 +4737,28 @@ export interface operations {
         };
     };
     hardDeleteDeletedItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RsDataVoid"];
+                };
+            };
+        };
+    };
+    deleteTempDraft: {
         parameters: {
             query?: never;
             header?: never;

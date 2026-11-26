@@ -22,6 +22,10 @@ type UseEditorStudioServerTempDraftAutosaveParams = {
   postTags: string[]
   postCategory: string
   postVisibility: PostVisibility
+  postScheduledAt?: string
+  postSeriesName?: string
+  postSeriesOrder?: number | null
+  postCanonicalUrl?: string
   serverBaselineEditorFingerprintRef: MutableRefObject<string>
   onSaveServerTempDraft: (options?: { silent?: boolean }) => Promise<boolean>
 }
@@ -43,6 +47,10 @@ export const useEditorStudioServerTempDraftAutosave = ({
   postTags,
   postCategory,
   postVisibility,
+  postScheduledAt = "",
+  postSeriesName = "",
+  postSeriesOrder = null,
+  postCanonicalUrl = "",
   serverBaselineEditorFingerprintRef,
   onSaveServerTempDraft,
 }: UseEditorStudioServerTempDraftAutosaveParams) => {
@@ -83,6 +91,10 @@ export const useEditorStudioServerTempDraftAutosave = ({
       tags: postTags,
       category: postCategory,
       visibility: postVisibility,
+      scheduledAt: postScheduledAt,
+      seriesName: postSeriesName,
+      seriesOrder: postSeriesOrder,
+      canonicalUrl: postCanonicalUrl,
     })
 
     if (
@@ -109,9 +121,13 @@ export const useEditorStudioServerTempDraftAutosave = ({
     editorMode,
     isTempDraftMode,
     loadingKey,
+    postCanonicalUrl,
     postCategory,
     postContent,
     postId,
+    postScheduledAt,
+    postSeriesName,
+    postSeriesOrder,
     postSummary,
     postSummarySource,
     postTags,

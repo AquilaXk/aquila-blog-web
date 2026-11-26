@@ -217,3 +217,15 @@ export const BubbleActionButton = styled.button`
   }
   @media (pointer: coarse), (max-width: 768px) { min-width: 44px; min-height: 44px; margin: 2px; }
 `
+
+export const BlockDropIndicatorBar = styled.div<{ $top: number; $left: number }>`
+  position: absolute;
+  top: ${({ $top }) => $top}px;
+  left: ${({ $left }) => $left}px;
+  right: 24px;
+  height: 2px;
+  border-radius: 999px;
+  background: ${({ theme }) => theme.publicDesign.accent};
+  pointer-events: none;
+  z-index: 6;
+`

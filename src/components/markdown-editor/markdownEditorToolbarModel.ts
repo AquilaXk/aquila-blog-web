@@ -1,4 +1,4 @@
-import type { WheelEvent as ReactWheelEvent } from "react"
+import { useEffect, useState, type WheelEvent as ReactWheelEvent } from "react"
 import type { SiteLanguage } from "../../libs/language"
 import type { BlockSnippetSpec } from "./markdownEditorBlockSnippets"
 import type { MarkdownEditorCommandDescriptor } from "./markdownEditorCommandRegistryModel"
@@ -18,20 +18,38 @@ export const buildToolbarTableSnippet = (rows: number, columns: number): BlockSn
   return { snippet, cursorOffset: snippet.indexOf(emptyRow) + 2 }
 }
 
-export const getToolbarCommandLabel = (
-  command: MarkdownEditorCommandDescriptor,
-  language: SiteLanguage = "ko"
-) => {
-  const baseLabel = language === "en" ? command.labelEn : command.label
-  return command.shortcut
-    ? `${baseLabel} (${command.shortcut.replace("Mod+", modShortcutLabel)})`
-    : baseLabel
-}
+// Keep module-level export SSR-safe so SSR and initial CSR render match byte-for-byte.
+export const modShortcutLabel = "Ctrl+"
 
-export const modShortcutLabel =
+export const detectClientModShortcutLabel = (): "⌘" | "Ctrl+" =>
   typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)
     ? "⌘"
     : "Ctrl+"
+
+export const useModShortcutLabel = (): "⌘" | "Ctrl+" => {
+  const [label, setLabel] = useState<"⌘" | "Ctrl+">(modShortcutLabel)
+  useEffect(() => {
+    const clientLabel = detectClientModShortcutLabel()
+    if (clientLabel !== label) {
+      setLabel(clientLabel)
+    }
+  }, [label])
+  return label
+}
+
+export const formatShortcutDisplay = (text: string, activeModLabel: string = modShortcutLabel): string =>
+  activeModLabel === modShortcutLabel ? text : text.replaceAll(modShortcutLabel, activeModLabel)
+
+export const getToolbarCommandLabel = (
+  command: MarkdownEditorCommandDescriptor,
+  language: SiteLanguage = "ko",
+  activeModLabel: string = modShortcutLabel
+) => {
+  const baseLabel = language === "en" ? command.labelEn : command.label
+  return command.shortcut
+    ? `${baseLabel} (${command.shortcut.replace("Mod+", activeModLabel)})`
+    : baseLabel
+}
 
 export const toolbarMarkdownSnippets = [
   { group: "heading", label: "H2", title: "제목 2 (권장)", titleEn: "Heading 2", before: "## ", after: "" },

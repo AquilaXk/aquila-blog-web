@@ -116,9 +116,25 @@ const buildBreadcrumbJsonLd = (
   ],
 })
 
+export const normalizeExternalCanonicalUrl = (rawUrl: string | null | undefined): string => {
+  const trimmed = (rawUrl ?? "").trim()
+  if (!trimmed || trimmed.length > 2048 || /[\u0000-\u0020\u007f]/.test(trimmed)) return ""
+  try {
+    const parsed = new URL(trimmed)
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) {
+      return ""
+    }
+    return parsed.toString()
+  } catch {
+    return ""
+  }
+}
+
 export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
   const canonicalPath = toCanonicalPostPath(post.id)
-  const canonicalUrl = `${SITE_URL}${canonicalPath}`
+  const selfCanonicalUrl = `${SITE_URL}${canonicalPath}`
+  const externalCanonicalUrl = normalizeExternalCanonicalUrl(post.canonicalUrl)
+  const canonicalUrl = externalCanonicalUrl || selfCanonicalUrl
   const publishedDate =
     toIsoDate(post.createdAt) ?? toIsoDate(post.createdTime) ?? toIsoDate(post.date?.start_date)
   const modifiedDate =
@@ -133,16 +149,17 @@ export const buildPostDetailMetadata = (post: TPost): MetaConfigProps => {
     image,
     description: post.summary || "",
     type: resolveOpenGraphType(rawType),
-    url: canonicalUrl,
+    url: selfCanonicalUrl,
+    canonicalUrl,
     jsonLd: [
       buildBlogPostingJsonLd({
         post,
-        canonicalUrl,
+        canonicalUrl: selfCanonicalUrl,
         publishedDate,
         modifiedDate,
         image,
       }),
-      buildBreadcrumbJsonLd(post, canonicalUrl),
+      buildBreadcrumbJsonLd(post, selfCanonicalUrl),
     ],
   }
 }

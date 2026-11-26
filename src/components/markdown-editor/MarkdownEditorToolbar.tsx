@@ -54,10 +54,11 @@ import {
   blockMarkdownSnippets,
   buildToolbarTableSnippet,
   directiveBlockMarkdownSnippets,
+  formatShortcutDisplay,
   getToolbarCommandLabel,
-  modShortcutLabel,
   toolbarListCommands,
   toolbarMarkdownSnippets,
+  useModShortcutLabel,
 } from "./markdownEditorToolbarModel"
 
 type MarkdownEditorToolbarProps = {
@@ -149,6 +150,7 @@ const MarkdownEditorToolbarView = ({
   onViewModeChange,
 }: MarkdownEditorToolbarProps) => {
   const { language } = useLanguage()
+  const activeModLabel = useModShortcutLabel()
   const isEn = language === "en"
   const isAuthoringDisabled = disabled || viewMode === "reading"
   const effectiveCommandContext: MarkdownEditorCommandContext = isAuthoringDisabled
@@ -168,7 +170,7 @@ const MarkdownEditorToolbarView = ({
             {toolbarCommands
               .filter((command) => command.category === "format")
               .map((command) => {
-                const label = getToolbarCommandLabel(command, language)
+                const label = getToolbarCommandLabel(command, language, activeModLabel)
                 return (
                   <ToolbarButton
                     key={command.id}
@@ -186,7 +188,7 @@ const MarkdownEditorToolbarView = ({
             {toolbarMarkdownSnippets
               .filter((snippet) => snippet.group === "primary")
               .map((snippet) => {
-                const localizedTitle = isEn ? snippet.titleEn : snippet.title
+                const localizedTitle = formatShortcutDisplay(isEn ? snippet.titleEn : snippet.title, activeModLabel)
                 return (
                   <ToolbarButton
                     key={snippet.title}
@@ -208,8 +210,8 @@ const MarkdownEditorToolbarView = ({
 
             <ToolbarButton
               type="button"
-              title={editorT("toolbarLinkTitle", language)}
-              aria-label={editorT("toolbarLinkTitle", language)}
+              title={editorT("toolbarLinkTitle", language, activeModLabel)}
+              aria-label={editorT("toolbarLinkTitle", language, activeModLabel)}
               disabled={isAuthoringDisabled}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
@@ -380,7 +382,7 @@ const MarkdownEditorToolbarView = ({
                 .filter((snippet) => snippet.group === "more")
                 .map((snippet) => ({
                   id: snippet.title,
-                  label: isEn ? snippet.titleEn : snippet.title,
+                  label: formatShortcutDisplay(isEn ? snippet.titleEn : snippet.title, activeModLabel),
                   icon: renderMenuItemIcon(snippet.label),
                   onSelect: () =>
                     onApplySnippet(snippet.before, snippet.after, {
@@ -446,8 +448,8 @@ const MarkdownEditorToolbarView = ({
           <ToolbarButton
             type="button"
             data-mobile-hidden="true"
-            title={editorT("toolbarQuickFindTitle", language)}
-            aria-label={editorT("toolbarQuickFindTitle", language)}
+            title={editorT("toolbarQuickFindTitle", language, activeModLabel)}
+            aria-label={editorT("toolbarQuickFindTitle", language, activeModLabel)}
             disabled={isAuthoringDisabled}
             onMouseDown={(event) => event.preventDefault()}
             onClick={onOpenFindReplace}
@@ -457,7 +459,7 @@ const MarkdownEditorToolbarView = ({
           <ToolbarModeSegmentGroup role="group" aria-label={editorT("toolbarGroupMode", language)}>
             <ToolbarModeSegmentButton
               type="button"
-              title={editorT("toolbarModeLiveTitle", language)}
+              title={editorT("toolbarModeLiveTitle", language, activeModLabel)}
               aria-label={editorT("toolbarModeLiveAria", language)}
               aria-pressed={viewMode === "live"}
               disabled={disabled}
@@ -469,7 +471,7 @@ const MarkdownEditorToolbarView = ({
             </ToolbarModeSegmentButton>
             <ToolbarModeSegmentButton
               type="button"
-              title={editorT("toolbarModeSourceTitle", language)}
+              title={editorT("toolbarModeSourceTitle", language, activeModLabel)}
               aria-label={editorT("toolbarModeSourceAria", language)}
               aria-pressed={viewMode === "source"}
               disabled={disabled}
@@ -483,7 +485,7 @@ const MarkdownEditorToolbarView = ({
               type="button"
               data-mobile-hidden="true"
               data-testid="markdown-editor-mode-split"
-              title={editorT("toolbarModeSplitTitle", language)}
+              title={editorT("toolbarModeSplitTitle", language, activeModLabel)}
               aria-label={editorT("toolbarModeSplitAria", language)}
               aria-pressed={viewMode === "split"}
               disabled={disabled}
@@ -495,7 +497,7 @@ const MarkdownEditorToolbarView = ({
             </ToolbarModeSegmentButton>
             <ToolbarModeSegmentButton
               type="button"
-              title={editorT("toolbarModeReadingTitle", language)}
+              title={editorT("toolbarModeReadingTitle", language, activeModLabel)}
               aria-label={editorT("toolbarModeReadingAria", language)}
               aria-pressed={viewMode === "reading"}
               disabled={disabled}

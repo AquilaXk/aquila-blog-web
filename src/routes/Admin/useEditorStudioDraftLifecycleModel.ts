@@ -51,12 +51,14 @@ export const useEditorStudioLocalDraftLifecycle = ({
   lastWriteFingerprintRef, lastWriteIdempotencyKeyRef, loadingKey, normalizeCategoryValue,
   persistLocalDraft, postCategory, postContent, getCurrentPostContent, postId, postSummary,
   postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
-  postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility, readLocalDraft,
+  postThumbnailUrl, postThumbnailZoom, postTitle, postVersion, postVisibility,
+  postScheduledAt = "", postSeriesName = "", postSeriesOrder = null, postCanonicalUrl = "", readLocalDraft,
   removeLocalDraft, setEditorMode, setIsTempDraftMode, setLocalDraftSavedAt,
   setPostCategory, setPostContent, setPostId, setPostSummary,
   setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
   setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
-  setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
+  setPostVersion, setPostVisibility, setPostScheduledAt, setPostSeriesName,
+  setPostSeriesOrder, setPostCanonicalUrl, setPreviewThumbnailSourceUrl, setPublishStatus,
 }: UseEditorStudioLocalDraftLifecycleParams) => {
   const draftSource = useMemo(
     () => resolveLocalDraftSource(editorMode, postId),
@@ -134,11 +136,15 @@ export const useEditorStudioLocalDraftLifecycle = ({
       tags: dedupeStrings(postTags),
       category: postCategory.trim() ? normalizeCategoryValue(postCategory) : "",
       visibility: postVisibility,
+      scheduledAt: postScheduledAt,
+      seriesName: postSeriesName,
+      seriesOrder: postSeriesOrder,
+      canonicalUrl: postCanonicalUrl,
     }),
     [
-      dedupeStrings, normalizeCategoryValue, postCategory, postContent, postSummary,
-      postSummarySource, summaryIntent, postTags, postThumbnailFocusX, postThumbnailFocusY,
-      postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
+      dedupeStrings, normalizeCategoryValue, postCanonicalUrl, postCategory, postContent, postScheduledAt,
+      postSeriesName, postSeriesOrder, postSummary, postSummarySource, summaryIntent, postTags,
+      postThumbnailFocusX, postThumbnailFocusY, postThumbnailUrl, postThumbnailZoom, postTitle, postVisibility,
     ]
   )
 
@@ -326,6 +332,10 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostTags(draft.tags)
     setPostCategory(draft.category)
     setPostVisibility(draft.visibility)
+    setPostScheduledAt?.(draft.scheduledAt ?? "")
+    setPostSeriesName?.(draft.seriesName ?? "")
+    setPostSeriesOrder?.(draft.seriesOrder ?? null)
+    setPostCanonicalUrl?.(draft.canonicalUrl ?? "")
 
     setLocalDraftSavedAt(draft.savedAt || "")
     setPublishStatus(
@@ -342,7 +352,8 @@ export const useEditorStudioLocalDraftLifecycle = ({
     setPostCategory, setPostContent, setPostId, setPostSummary,
     setPostSummarySource, setSummaryIntent, setPostTags, setPostThumbnailFocusX,
     setPostThumbnailFocusY, setPostThumbnailUrl, setPostThumbnailZoom, setPostTitle,
-    setPostVersion, setPostVisibility, setPreviewThumbnailSourceUrl, setPublishStatus,
+    setPostVersion, setPostVisibility, setPostScheduledAt, setPostSeriesName,
+    setPostSeriesOrder, setPostCanonicalUrl, setPreviewThumbnailSourceUrl, setPublishStatus,
   ])
 
   const clearLocalDraft = useCallback(() => {

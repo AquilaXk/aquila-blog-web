@@ -226,6 +226,10 @@ export const buildSitemapPostsPath = (limit = SITEMAP_API_MAX_LIMIT) => {
 }
 
 const POSTS_BACKLINKS_PATH_TEMPLATE = asOpenApiPath("/post/api/v1/posts/{id}/backlinks")
+const POSTS_SERIES_PATH_TEMPLATE = asOpenApiPath("/post/api/v1/posts/{id}/series")
 
 export const buildPostBacklinksPath = (postId: string | number) =>
   POSTS_BACKLINKS_PATH_TEMPLATE.replace("{id}", encodeURIComponent(String(postId).trim()))
+
+export const buildPostSeriesPath = (postId: string | number) =>
+  POSTS_SERIES_PATH_TEMPLATE.replace("{id}", encodeURIComponent(String(postId).trim()))

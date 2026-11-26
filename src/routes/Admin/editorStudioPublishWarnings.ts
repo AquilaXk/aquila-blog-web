@@ -5,6 +5,9 @@ export type MarkdownPrePublishWarning =
   | { kind: "unclosed-directive"; line: number }
   | { kind: "placeholder-marker"; line: number; token: string }
   | { kind: "body-h1"; count: number; firstLine: number }
+  | { kind: "content-too-long"; length: number; maxLength: number }
+
+const MAX_POST_BODY_LENGTH = 500_000
 
 const FENCE_OPEN_RE = /^( {0,3})(`{3,}|~{3,})([^\r\n]*)$/
 const CONTAINER_OPEN_RE = /^(:{3,})\s*(callout|toggle|embed|bookmark)\b/
@@ -107,6 +110,9 @@ export const scanMarkdownPrePublishWarnings = (content: string): MarkdownPrePubl
   }
   if (bodyH1Count > 0) {
     warnings.push({ kind: "body-h1", count: bodyH1Count, firstLine: firstBodyH1Line })
+  }
+  if (normalized.length > MAX_POST_BODY_LENGTH) {
+    warnings.push({ kind: "content-too-long", length: normalized.length, maxLength: MAX_POST_BODY_LENGTH })
   }
   return warnings
 }

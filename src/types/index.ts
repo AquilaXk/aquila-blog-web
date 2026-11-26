@@ -40,6 +40,10 @@ export type TPost = {
   hitCount?: number
   actorCanModify?: boolean
   actorCanDelete?: boolean
+  scheduledAt?: string | null
+  seriesName?: string | null
+  seriesOrder?: number | null
+  canonicalUrl?: string | null
 
   date?: { start_date: string }
   type?: TPostType[]

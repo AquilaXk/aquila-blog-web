@@ -6,6 +6,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useState } from "react"
 import AppIcon from "./AdminAppIcon"
 import { useLanguage } from "src/libs/language"
+import { adminT } from "./adminI18n"
 import { buildPostOgImagePath } from "src/libs/og/ogUrl"
 import {
   CompactPublishEditorCard,
@@ -58,6 +59,7 @@ export const EditorStudioPublishVisibilitySection = ({
   visibilityOptions,
   onPostVisibilityChange,
 }: VisibilitySectionProps) => {
+  const { language } = useLanguage()
   const handleRadioKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (visibilityOptions.length === 0) return
     const isNext = event.key === "ArrowDown" || event.key === "ArrowRight"
@@ -81,11 +83,11 @@ export const EditorStudioPublishVisibilitySection = ({
 
   return (
     <VisibilityCard data-testid="publish-visibility-panel">
-      <SectionKicker>노출 범위</SectionKicker>
-      <strong>누가 이 글을 볼 수 있나요?</strong>
+      <SectionKicker>{adminT("editorVisibilitySectionKicker", language)}</SectionKicker>
+      <strong>{adminT("editorVisibilityQuestion", language)}</strong>
       <VisibilityOptionGrid
         role="radiogroup"
-        aria-label="노출 범위 선택"
+        aria-label={adminT("editorVisibilityGroupAria", language)}
         onKeyDown={handleRadioKeyDown}
       >
         {visibilityOptions.map((option) => {
@@ -106,7 +108,7 @@ export const EditorStudioPublishVisibilitySection = ({
           )
         })}
       </VisibilityOptionGrid>
-      <FieldHelp>메인 피드 노출은 전체 공개에서만 활성화됩니다.</FieldHelp>
+      <FieldHelp>{adminT("editorVisibilityFeedHelp", language)}</FieldHelp>
     </VisibilityCard>
   )
 }
@@ -135,59 +137,69 @@ export const EditorStudioPublishCardSettings = ({
   thumbnailEditorPanel,
   onToggleMobileMetaEditor,
   onToggleMobileThumbnailEditor,
-}: CardSettingsProps) => (
-  <PostPreviewSetup>
-    <OptionalCoverDisclosure open={hasManualThumbnail || undefined}>
-      <OptionalCoverSummary>
-        <div>
-          <strong>공유 대표 이미지 직접 지정 (선택)</strong>
-          <span>
-            {setupDescription ||
-              "비워두면 본문 첫 이미지 또는 제목 기반 OG 카드가 공유 미리보기에 자동 적용됩니다."}
-          </span>
-        </div>
-        <em>{hasManualThumbnail ? "수동 지정됨" : "자동 적용"}</em>
-      </OptionalCoverSummary>
-      {isCompactMobileLayout ? (
-        <CompactPublishEditorStack>
-          <CompactPublishEditorCard>
-            <CompactPublishEditorToggle
-              type="button"
-              aria-expanded={isMobileThumbnailEditorOpen}
-              onClick={onToggleMobileThumbnailEditor}
-            >
-              <div>
-                <strong>썸네일 위치 조정</strong>
-                <span>드래그/확대로 공유 대표 이미지 초점을 맞춥니다.</span>
-              </div>
-              <span>{isMobileThumbnailEditorOpen ? closeToggleLabel : "열기"}</span>
-            </CompactPublishEditorToggle>
-            {isMobileThumbnailEditorOpen ? thumbnailEditorPanel : null}
-          </CompactPublishEditorCard>
-          <CompactPublishEditorCard>
-            <CompactPublishEditorToggle
-              type="button"
-              aria-expanded={isMobileMetaEditorOpen}
-              onClick={onToggleMobileMetaEditor}
-            >
-              <div>
-                <strong>카드 메타 편집</strong>
-                <span>썸네일 URL과 업로드 방식을 설정합니다.</span>
-              </div>
-              <span>{isMobileMetaEditorOpen ? closeToggleLabel : "열기"}</span>
-            </CompactPublishEditorToggle>
-            {isMobileMetaEditorOpen ? previewMetaEditorPanel : null}
-          </CompactPublishEditorCard>
-        </CompactPublishEditorStack>
-      ) : (
-        <PreviewEditorGrid>
-          {thumbnailEditorPanel}
-          {previewMetaEditorPanel}
-        </PreviewEditorGrid>
-      )}
-    </OptionalCoverDisclosure>
-  </PostPreviewSetup>
-)
+}: CardSettingsProps) => {
+  const { language } = useLanguage()
+  return (
+    <PostPreviewSetup>
+      <OptionalCoverDisclosure open={hasManualThumbnail || undefined}>
+        <OptionalCoverSummary>
+          <div>
+            <strong>{adminT("editorCoverOptionalHeading", language)}</strong>
+            <span>
+              {setupDescription || adminT("editorCoverAutoSetupDesc", language)}
+            </span>
+          </div>
+          <em>
+            {hasManualThumbnail
+              ? adminT("editorCoverManualBadge", language)
+              : adminT("editorCoverAutoBadge", language)}
+          </em>
+        </OptionalCoverSummary>
+        {isCompactMobileLayout ? (
+          <CompactPublishEditorStack>
+            <CompactPublishEditorCard>
+              <CompactPublishEditorToggle
+                type="button"
+                aria-expanded={isMobileThumbnailEditorOpen}
+                onClick={onToggleMobileThumbnailEditor}
+              >
+                <div>
+                  <strong>{adminT("editorThumbFocusHeading", language)}</strong>
+                  <span>{adminT("editorThumbFocusDesc", language)}</span>
+                </div>
+                <span>
+                  {isMobileThumbnailEditorOpen ? closeToggleLabel : adminT("editorPanelOpenLabel", language)}
+                </span>
+              </CompactPublishEditorToggle>
+              {isMobileThumbnailEditorOpen ? thumbnailEditorPanel : null}
+            </CompactPublishEditorCard>
+            <CompactPublishEditorCard>
+              <CompactPublishEditorToggle
+                type="button"
+                aria-expanded={isMobileMetaEditorOpen}
+                onClick={onToggleMobileMetaEditor}
+              >
+                <div>
+                  <strong>{adminT("editorCardMetaHeading", language)}</strong>
+                  <span>{adminT("editorCardMetaDesc", language)}</span>
+                </div>
+                <span>
+                  {isMobileMetaEditorOpen ? closeToggleLabel : adminT("editorPanelOpenLabel", language)}
+                </span>
+              </CompactPublishEditorToggle>
+              {isMobileMetaEditorOpen ? previewMetaEditorPanel : null}
+            </CompactPublishEditorCard>
+          </CompactPublishEditorStack>
+        ) : (
+          <PreviewEditorGrid>
+            {thumbnailEditorPanel}
+            {previewMetaEditorPanel}
+          </PreviewEditorGrid>
+        )}
+      </OptionalCoverDisclosure>
+    </PostPreviewSetup>
+  )
+}
 
 export const resolveSiteOrigin = (): string => {
   if (process.env.NEXT_PUBLIC_SITE_URL?.trim()) {

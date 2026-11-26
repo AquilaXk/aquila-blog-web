@@ -14,8 +14,12 @@ export type VisibilityFlags = {
   listed: boolean
 }
 
-export const toVisibility = (published: boolean, listed: boolean): PostVisibility => {
-  if (!published) return "PRIVATE"
+export const toVisibility = (
+  published: boolean,
+  listed: boolean,
+  scheduledAt?: string | null
+): PostVisibility => {
+  if (!published && !(scheduledAt && scheduledAt.trim())) return "PRIVATE"
   if (!listed) return "PUBLIC_UNLISTED"
   return "PUBLIC_LISTED"
 }
