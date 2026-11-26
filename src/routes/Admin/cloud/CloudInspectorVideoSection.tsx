@@ -83,7 +83,7 @@ const copyCommandWithClipboardOrInline = async (
     }
   }
   if (!showManualFallback()) {
-    throw new Error(isEn ? "Clipboard is unavailable." : "clipboard를 사용할 수 없습니다.")
+    throw new Error(isEn ? "Clipboard is unavailable." : "클립보드를 사용할 수 없습니다.")
   }
 }
 

@@ -546,6 +546,30 @@ caption
     expect((await validateCloudFileBeforeUpload(new File([mzExe], "disguised.png", { type: "image/png" }))).ok).toBe(
       false
     )
+
+    // 백엔드와 포맷·UTF-8/NUL 검증 정합성 검증
+    const aviBytes = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x41, 0x56, 0x49, 0x20])
+    expect((await validateCloudFileBeforeUpload(new File([aviBytes], "clip.avi", { type: "video/x-msvideo" }))).ok).toBe(
+      false
+    )
+    expect((await validateCloudFileBeforeUpload(new File(["a=1\n"], "app.properties", { type: "" }))).ok).toBe(false)
+    expect((await validateCloudFileBeforeUpload(new File(["KEY=1\n"], ".env", { type: "" }))).ok).toBe(true)
+    expect((await validateCloudFileBeforeUpload(new File(["PORT=3000\n"], "site.env", { type: "" }))).ok).toBe(true)
+    expect((await validateCloudFileBeforeUpload(new File(["# hi\n<Box/>\n"], "guide.mdx", { type: "" }))).ok).toBe(true)
+    expect((await validateCloudFileBeforeUpload(new File(["page1\f\npage2"], "report.txt", { type: "text/plain" }))).ok).toBe(
+      true
+    )
+    expect(
+      (await validateCloudFileBeforeUpload(new File(['{"ok":true}\n'], "payload", { type: "application/json" }))).ok
+    ).toBe(true)
+    const nulSvg = new File([new Uint8Array([0x3c, 0x73, 0x76, 0x67, 0x00, 0x3e])], "nul.svg", {
+      type: "image/svg+xml",
+    })
+    const badUtf8Svg = new File([new Uint8Array([0x3c, 0x73, 0x76, 0x67, 0x3e, 0xff, 0xfe])], "bad.svg", {
+      type: "image/svg+xml",
+    })
+    expect((await validateCloudFileBeforeUpload(nulSvg)).ok).toBe(false)
+    expect((await validateCloudFileBeforeUpload(badUtf8Svg)).ok).toBe(false)
   })
 
   test("cloud XHR retry classification, EMA speed estimator, and aggregate queue ETA behave deterministically", () => {

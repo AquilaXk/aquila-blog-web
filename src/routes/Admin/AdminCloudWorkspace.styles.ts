@@ -339,8 +339,12 @@ export const FileTable = styled.table`
       white-space: nowrap;
     }
     tbody tr {
-      grid-template-columns: 2rem minmax(0, 1fr) auto;
+      grid-template-columns: 2.75rem minmax(0, 1fr) auto;
       gap: 0.25rem 0.5rem;
+    }
+    tbody tr td:first-of-type {
+      padding-left: 0;
+      justify-content: center;
     }
     td:nth-of-type(2) {
       grid-column: 2 / 4;

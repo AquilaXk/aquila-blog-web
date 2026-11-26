@@ -116,9 +116,14 @@ export const CloudShareLinkModal = ({
 
   const copyTextToClipboard = async (label: string, text: string) => {
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text)
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error(
+          language === "en"
+            ? "Clipboard permission is unavailable. Please copy the link manually below."
+            : "클립보드 접근 권한이 없습니다. 아래 입력창에서 직접 복사해주세요."
+        )
       }
+      await navigator.clipboard.writeText(text)
       setCopiedTarget(label)
       onToast({ tone: "success", text: `${label} — ${t.shareCopied}` })
     } catch (error) {

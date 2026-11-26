@@ -360,7 +360,9 @@ const CloudAssetPickerOpenBody = ({ onInsertMarkdownSnippet }: EditorStudioCloud
                     {folderText ? ` · /${folderText}` : ""}
                   </span>
                   {!eligibility.promotable ? (
-                    <span className="assetIneligibleReason">{eligibility.reason}</span>
+                    <span className="assetIneligibleReason" title={eligibility.reason}>
+                      {eligibility.reason}
+                    </span>
                   ) : null}
                 </div>
                 <SecondaryButton
@@ -584,6 +586,11 @@ const CloudAssetPickerSection = styled.section`
     .assetIneligibleReason {
       color: ${({ theme }) => theme.colors.red11};
       font-weight: 600;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: keep-all;
+      line-height: 1.3;
     }
   }
 `

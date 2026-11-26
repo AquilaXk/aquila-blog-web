@@ -9,6 +9,7 @@ import {
   type RefObject,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import {
@@ -58,6 +59,7 @@ import {
 import { getStrapiAssetIcon } from "../adminStrapiIcons"
 import {
   CardKebabButton,
+  CloudCheckboxHitLabel,
   SortableHeaderButton,
   TruncatedFilename,
 } from "./AdminCloudOverlay.styles"
@@ -234,6 +236,7 @@ export const CloudFileTableSection = ({
   const t = getCloudDictionary(language)
   const isEn = language === "en"
   const checkedFileIdSet = useMemo(() => new Set(checkedFileIds), [checkedFileIds])
+  const lastShiftKeyRef = useRef(false)
 
   if (showEmptyLoading) {
     return (
@@ -308,14 +311,26 @@ export const CloudFileTableSection = ({
               }}
             >
               <SelectBoxCell>
-                <RowCheckbox
-                  type="checkbox"
-                  aria-label={isEn ? `Select ${file.originalFilename}` : `${file.originalFilename} 선택`}
-                  checked={checked}
-                  onClick={(event) => onToggleChecked(file.id, event.shiftKey)}
+                <CloudCheckboxHitLabel
+                  onPointerDown={(event) => {
+                    lastShiftKeyRef.current = event.shiftKey
+                  }}
                   onDoubleClick={(event) => event.stopPropagation()}
-                  onChange={() => {}}
-                />
+                >
+                  <RowCheckbox
+                    type="checkbox"
+                    aria-label={isEn ? `Select ${file.originalFilename}` : `${file.originalFilename} 선택`}
+                    checked={checked}
+                    onKeyDown={(event) => {
+                      lastShiftKeyRef.current = event.shiftKey
+                    }}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onChange={() => {
+                      onToggleChecked(file.id, lastShiftKeyRef.current)
+                      lastShiftKeyRef.current = false
+                    }}
+                  />
+                </CloudCheckboxHitLabel>
               </SelectBoxCell>
               <td>
                 <FileIdentity>

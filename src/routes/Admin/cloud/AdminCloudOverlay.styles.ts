@@ -243,10 +243,30 @@ export const ContextMenuButton = styled.button<{ $danger?: boolean }>`
   }
 `
 
+export const CloudCheckboxHitLabel = styled.label`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:has(input:focus-visible) {
+    outline: 2px solid ${borderStrong};
+    outline-offset: 1px;
+  }
+
+  @media (pointer: coarse) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+`
+
 export const CloudModalBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  z-index: ${zIndexes.dialog + 20};
+  z-index: ${zIndexes.publishModal};
   display: grid;
   place-items: center;
   padding: 1rem;

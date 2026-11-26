@@ -19,7 +19,6 @@ const MAGIC_GIF8 = 0x47494638 // GIF8
 const MAGIC_RIFF = 0x52494646 // RIFF
 const MAGIC_WEBP = 0x57454250 // WEBP
 const MAGIC_WAVE = 0x57415645 // WAVE
-const MAGIC_AVI = 0x41564920 // "AVI "
 const MAGIC_FTYP = 0x66747970 // ftyp
 const MAGIC_MOOV = 0x6d6f6f76 // QuickTime moov
 const MAGIC_MDAT = 0x6d646174 // QuickTime mdat
@@ -50,10 +49,11 @@ const MAGIC_MACHO_64_LE = 0xcffaedfe
 const SVG_XSS_PATTERN =
   /<!\s*(?:doctype|entity)\b|&#|<\s*script\b|<\s*foreignobject\b|<\s*iframe\b|<\s*object\b|<\s*embed\b|javascript\s*:|vbscript\s*:|data\s*:\s*text\/html|\bon[a-z]+\s*=/i
 
-// 128바이트 ASCII 허용 테이블 (\t, \n, \r, 0x20..0x7E)
+// 128바이트 ASCII 허용 테이블 (\t, \n, \f, \r, 0x20..0x7E)
 const TEXT_ASCII_ALLOWED = new Uint8Array(128)
 TEXT_ASCII_ALLOWED[0x09] = 1
 TEXT_ASCII_ALLOWED[0x0a] = 1
+TEXT_ASCII_ALLOWED[0x0c] = 1
 TEXT_ASCII_ALLOWED[0x0d] = 1
 for (let c = 0x20; c <= 0x7e; c += 1) {
   TEXT_ASCII_ALLOWED[c] = 1
@@ -89,30 +89,35 @@ const RASTER_PHOTO_EXTENSIONS = new Set([
 
 const PHOTO_EXTENSIONS = new Set([...RASTER_PHOTO_EXTENSIONS, "svg"])
 
-const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "mkv", "avi"])
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "mkv"])
 
 const ZIP_DOCUMENT_AND_ARCHIVE_EXTENSIONS = new Set(["zip", "hwpx", "docx", "xlsx", "pptx"])
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "opus", "m4a", "aac", "flac"])
 const ARCHIVE_EXTENSIONS = new Set(["zip", "tar", "gz", "tgz", "7z"])
 const TEXT_EXTENSIONS = new Set([
   "txt",
+  "log",
+  "ini",
+  "conf",
+  "cfg",
+  "toml",
+  "env",
   "md",
   "markdown",
-  "json",
-  "yaml",
-  "yml",
+  "mdx",
   "csv",
   "tsv",
-  "log",
-  "toml",
-  "ini",
-  "properties",
-  "conf",
+  "json",
+  "jsonl",
+  "ndjson",
+  "yaml",
+  "yml",
   "xml",
+  "html",
+  "htm",
   "css",
   "js",
   "mjs",
-  "cjs",
   "ts",
   "tsx",
   "jsx",
@@ -123,7 +128,14 @@ const TEXT_EXTENSIONS = new Set([
   "go",
   "rs",
   "sql",
-  "diff",
+])
+
+const TEXT_MIME_TYPES = new Set([
+  "application/json",
+  "application/yaml",
+  "application/x-yaml",
+  "application/xml",
+  "application/javascript",
 ])
 
 const ALLOWED_NON_MEDIA_EXTENSIONS = new Set([
@@ -305,6 +317,9 @@ const isValidVideoSignature = (
   ext: string,
   lowerMime: string
 ): boolean => {
+  if (ext && !VIDEO_EXTENSIONS.has(ext)) {
+    return false
+  }
   const isMp4Family =
     ext === "mp4" ||
     ext === "mov" ||
@@ -325,18 +340,7 @@ const isValidVideoSignature = (
     return byteLength >= 4 && view.getUint32(0, false) === MAGIC_EBML
   }
 
-  if (ext === "avi" || lowerMime === "video/x-msvideo") {
-    return (
-      byteLength >= 12 &&
-      view.getUint32(0, false) === MAGIC_RIFF &&
-      view.getUint32(8, false) === MAGIC_AVI
-    )
-  }
-
-  return (
-    byteLength >= 8 &&
-    (isIsoBaseMediaVideoAtom(view.getUint32(4, false)) || view.getUint32(0, false) === MAGIC_EBML)
-  )
+  return false
 }
 
 const isValidAudioSignature = (
@@ -386,7 +390,16 @@ const validateSvgPayload = async (file: File): Promise<FileSignatureValidationRe
   }
   const svgSlice = file.slice(0, Math.min(file.size, MAX_SVG_SCAN_BYTES))
   const svgBuffer = await svgSlice.arrayBuffer()
-  const text = new TextDecoder("utf-8", { fatal: false }).decode(svgBuffer)
+  const svgBytes = new Uint8Array(svgBuffer)
+  if (svgBytes.includes(0x00)) {
+    return { ok: false, reason: "SVG 파일에 허용되지 않는 NUL 바이트가 포함되어 있습니다." }
+  }
+  let text: string
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(svgBytes)
+  } catch {
+    return { ok: false, reason: "SVG 파일의 UTF-8 인코딩이 올바르지 않습니다." }
+  }
   const lowerText = text.toLowerCase()
   if (!lowerText.includes("<svg")) {
     return { ok: false, reason: "유효한 SVG 루트 태그가 없는 파일입니다." }
@@ -531,7 +544,7 @@ export const validateCloudFileBeforeUpload = async (
         : { ok: false, reason: "TAR(ustar) 헤더 시그니처가 일치하지 않습니다." }
     }
 
-    if (TEXT_EXTENSIONS.has(ext) || lowerMime.startsWith("text/")) {
+    if (TEXT_EXTENSIONS.has(ext) || lowerMime.startsWith("text/") || TEXT_MIME_TYPES.has(lowerMime)) {
       return await validateTextPayload(file, ext)
     }
 
