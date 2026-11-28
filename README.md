@@ -27,8 +27,8 @@
 <p align="center">
   <a href="https://blog.aquilaxk.site"><b>블로그</b></a> ·
   <a href="https://www.aquilaxk.site"><b>Aquila Software</b></a> ·
-  <a href="#주요-화면"><b>주요 화면</b></a> ·
   <a href="#주요-기능"><b>주요 기능</b></a> ·
+  <a href="#주요-화면"><b>주요 화면</b></a> ·
   <a href="#빠른-시작"><b>빠른 시작</b></a> ·
   <a href="#문서"><b>문서</b></a> ·
   <a href="https://github.com/AquilaXk/aquila-blog"><b>Platform 저장소 ↗</b></a>
@@ -38,11 +38,11 @@
 
 ## 주요 기능
 
-- **기술 블로그와 아카이브** (`/`, `/posts/[id]`, `/about`) — 커서 기반 피드 탐색, 주제·태그 필터, 연재 시리즈 네비게이션, 목차, KaTeX 수식, Mermaid 다이어그램, 코드 블록, 커스텀 디렉티브(`:::callout`, `:::toggle`, `:::bookmark`, `:::embed`)를 에디터와 상세 페이지에서 동일하게 렌더링합니다.
-- **라이브 마크다운 에디터 스튜디오** (`/admin/editor/new`, `/admin/editor/[id]`) — CodeMirror 6 증분 라이브 프리뷰, 4가지 보기 전환(라이브·분할·원문·읽기)과 스크롤 동기화, `/` 슬래시 명령, 블록 드래그 핸들, 링크 버블 팝오버, 코드 언어 선택기, URL 언펄, `[[...]]` 위키링크 자동완성을 제공합니다.
-- **임시초안·발행 파이프라인** — 서버 다중 임시초안(`Drafts`)과 로컬 브라우저 초안 복구, 발행 준비도 점검, 리비전 차분(Diff) 비교, 예약 발행, 연재 시리즈 편성, 정본 URL(`canonicalUrl`) 설정, 커버 이미지 초점 조정을 한 작업 공간에서 처리합니다.
+- **기술 블로그와 아카이브** (`/`, `/posts/[id]`, `/about`) — 커서 기반 피드 탐색, 주제·태그 필터, 연재 시리즈 네비게이션, 목차, KaTeX 수식, Mermaid 다이어그램, 코드 블록, 커스텀 디렉티브(`:::callout`, `:::toggle`, `:::bookmark`, `:::embed`, `:::file`)를 에디터와 상세 페이지에서 동일하게 렌더링합니다.
+- **라이브 마크다운 에디터 스튜디오** (`/admin/editor/new`, `/admin/editor/[id]`) — CodeMirror 6 증분 라이브 프리뷰, 4가지 보기 전환(라이브·분할·원문·읽기)과 스크롤 동기화, `/` 슬래시 명령, 블록 드래그 핸들, 링크 버블 팝오버, 코드 언어 선택기·복사, 이미지 크기·정렬 제어, URL 언펄, `[[...]]` 위키링크 자동완성과 한/영 UI를 제공합니다.
+- **임시초안·발행 파이프라인** — 다중 서버 임시초안과 로컬 브라우저 초안 복구, 발행 준비도 점검, 리비전 차분(Diff) 비교, 예약 발행, 연재 시리즈 편성, 정본 URL 설정, 커버 이미지 초점 조정을 한 작업 공간에서 처리합니다.
 - **관리자·클라우드 워크스페이스** (`/admin`, `/admin/posts`, `/admin/profile`, `/admin/cloud`, `/admin/tools`) — 단일 관리자 이메일 코드 인증, 게시글 일괄 관리, 프로필 워크스페이스 편집·발행, 클라우드 멀티파트 이어올리기·서명된 공유·외부 재생 링크 관리, 운영 진단 도구를 지원합니다.
-- **제품·서비스 쇼케이스와 다운로드** (`/company`, `/download`, `/easysubway`) — Aquila Software 소개 화면과 EasyOffice·EasySubway·EasyConvert 안내, 최신 릴리스(`latest.json`, `SHA256SUMS.txt`) 연동을 단일 컨테이너 이미지로 서빙합니다.
+- **제품·서비스 쇼케이스와 다운로드** (`/company`, `/download`, `/easysubway`) — Aquila Software 소개 화면과 EasyOffice·EasySubway·EasyConvert 안내, EasyOffice 최신 릴리스(`latest.json`, `SHA256SUMS.txt`) 연동을 단일 컨테이너 이미지로 서빙합니다.
 - **Fail-Closed 보안과 정적·성능 가드** — 사설 IPv4/IPv6 차단 URL 언펄, 이미지 매직바이트·차원 선검증, 600줄·레이어 경계, 라이트 전용 토큰, 번들 크기·런타임 이미지 페이로드 예산, 계약 드리프트 검사를 CI에서 강제합니다.
 
 ## 주요 화면
@@ -65,7 +65,7 @@
 
 ### 제품·서비스 쇼케이스
 
-`www.aquilaxk.site`와 `easysubway.aquilaxk.site` 표면을 같은 standalone 이미지로 서빙합니다. EasySubway, EasyOffice, EasyConvert 소개와 최신 릴리스 체크섬 다운로드를 연결합니다.
+`www.aquilaxk.site`와 `easysubway.aquilaxk.site` 표면을 같은 standalone 이미지로 서빙합니다. EasySubway, EasyOffice, EasyConvert 소개와 EasyOffice 최신 릴리스·SHA-256 체크섬 검증 안내를 연결합니다.
 
 </td>
 <td width="58%">
@@ -76,7 +76,7 @@
 
 ## 빠른 시작
 
-로컬 실행에는 **Node.js `>=20.19`**와 **Yarn `1.22.22`**가 필요합니다. `.env.local` 또는 환경변수로 `NEXT_PUBLIC_BACKEND_URL`과 `BACKEND_INTERNAL_URL`을 지정해 백엔드 API와 연결합니다.
+로컬 실행에는 **Node.js `>=20.19`**(권장 `20 LTS`, [`.nvmrc`](.nvmrc))와 **Yarn `1.22.22`**가 필요합니다. `.env.local` 또는 환경변수로 `NEXT_PUBLIC_BACKEND_URL`과 `BACKEND_INTERNAL_URL`을 지정해 백엔드 API와 연결합니다.
 
 ```sh
 yarn install --frozen-lockfile   # 의존성 설치
@@ -135,9 +135,11 @@ aquila-blog-web/
 │   └── apis/                    # 백엔드 API 클라이언트 및 정책 레지스트리
 ├── packages/shared-contracts/   # 생성된 OpenAPI TypeScript 계약 패키지
 ├── contracts/platform/          # 플랫폼 공개 API 계약 스냅샷 및 잠금 파일
+├── public/                      # 브랜드 마스코트·파비콘·정적 자산
 ├── scripts/                     # 경계·색상·번들·페이로드·계약 검증 스크립트
 ├── tests/                       # 단위 테스트
-└── e2e/                         # Playwright 스모크·에디터·접근성·CSP 테스트
+├── e2e/                         # Playwright 스모크·에디터·접근성·CSP 테스트
+└── Dockerfile.runtime           # Next.js standalone 운영 컨테이너 이미지
 ```
 
 </details>
@@ -158,7 +160,7 @@ aquila-blog-web/
 
 ## 후원
 
-Aquila Blog Web은 오픈소스로 공개합니다. 후원금은 개발 시간과 테스트·홈서버 운영 비용에 쓰입니다. [github.com/sponsors/AquilaXk](https://github.com/sponsors/AquilaXk)
+Aquila Blog Web은 무료 오픈소스입니다. 후원금은 개발 시간과 테스트·홈서버 운영 비용에 쓰입니다. [github.com/sponsors/AquilaXk](https://github.com/sponsors/AquilaXk)
 
 ### 후원해 주신 분들
 
